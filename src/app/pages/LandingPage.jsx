@@ -10,7 +10,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div className="order-2 md:order-1">
               <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-                Your Medication Journey, Simplified
+                SideTrack: Your Medication Journey, Simplified
               </h1>
               <p className="text-xl md:text-2xl mb-8 opacity-90 leading-relaxed">
                 SideTrack helps you monitor wellness, track medication effects, and share insights with your healthcare team.
