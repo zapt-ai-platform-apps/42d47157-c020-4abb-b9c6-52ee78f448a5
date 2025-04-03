@@ -13,7 +13,7 @@ const SEVERITY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export default function SideEffectForm({ sideEffect, medications, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     id: sideEffect?.id || null,
-    medicationId: sideEffect?.medicationId || (medications[0]?.id || ''),
+    medicationId: sideEffect?.medicationId || '',
     symptom: sideEffect?.symptom || '',
     severity: sideEffect?.severity || 5,
     timeOfDay: sideEffect?.timeOfDay || TIME_OF_DAY_OPTIONS[0],
@@ -26,7 +26,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
   
   // Update selected medication if medications load after component mounts
   useEffect(() => {
-    if (!formData.medicationId && medications.length > 0) {
+    if ((!formData.medicationId || formData.medicationId === '') && medications.length > 0) {
       setFormData(prev => ({
         ...prev,
         medicationId: medications[0].id
@@ -59,14 +59,15 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
       // Make the API call to create/update the side effect
       const payload = {
         ...formData,
-        medicationId: parseInt(formData.medicationId),
+        medicationId: Number(formData.medicationId), // Ensure it's a number
         severity: parseInt(formData.severity)
       };
       
+      console.log('Submitting side effect with medication ID:', payload.medicationId);
       await onSubmit(payload);
     } catch (err) {
       console.error('Error saving side effect:', err);
-      setError('Failed to save side effect. Please try again.');
+      setError(err.message || 'Failed to save side effect. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
           name="medicationId"
           value={formData.medicationId}
           onChange={handleChange}
-          className="input box-border"
+          className="input box-border w-full"
           required
         >
           <option value="" disabled>Select a medication</option>
@@ -97,6 +98,9 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
             </option>
           ))}
         </select>
+        {formData.medicationId === '' && (
+          <p className="text-red-500 text-sm mt-1">Please select a medication</p>
+        )}
       </div>
       
       <div>
@@ -107,7 +111,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
           name="symptom"
           value={formData.symptom}
           onChange={handleChange}
-          className="input box-border"
+          className="input box-border w-full"
           placeholder="e.g., Headache, Dizziness, Nausea"
           required
         />
@@ -143,7 +147,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
           name="timeOfDay"
           value={formData.timeOfDay}
           onChange={handleChange}
-          className="input box-border"
+          className="input box-border w-full"
           required
         >
           {TIME_OF_DAY_OPTIONS.map((option) => (
@@ -162,7 +166,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
           name="date"
           value={formData.date}
           onChange={handleChange}
-          className="input box-border"
+          className="input box-border w-full"
           required
         />
       </div>
@@ -174,7 +178,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
           name="notes"
           value={formData.notes}
           onChange={handleChange}
-          className="input box-border min-h-[100px]"
+          className="input box-border min-h-[100px] w-full"
           placeholder="Add any additional details about the side effect"
         />
       </div>
@@ -191,7 +195,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
         <button
           type="submit"
           className="btn-primary cursor-pointer"
-          disabled={loading}
+          disabled={loading || formData.medicationId === ''}
         >
           {loading ? (
             <span className="flex items-center">

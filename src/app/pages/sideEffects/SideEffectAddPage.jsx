@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { SideEffectForm } from '@/modules/sideEffects';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
@@ -9,6 +9,7 @@ export default function SideEffectAddPage() {
   const [medications, setMedications] = useState([]);
   const [loadingMedications, setLoadingMedications] = useState(true);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   
   useEffect(() => {
     const fetchMedications = async () => {
@@ -28,6 +29,7 @@ export default function SideEffectAddPage() {
         }
         
         const data = await response.json();
+        console.log(`Fetched ${data.length} medications`);
         setMedications(data);
       } catch (err) {
         console.error('Error fetching medications:', err);
@@ -42,7 +44,18 @@ export default function SideEffectAddPage() {
   }, []);
   
   const handleSubmit = async (formData) => {
+    if (submitting) return;
+    
     try {
+      setSubmitting(true);
+      setError('');
+      
+      if (!formData.medicationId) {
+        throw new Error('Please select a medication');
+      }
+      
+      console.log('Submitting side effect with medication ID:', formData.medicationId);
+      
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch('/api/sideEffects', {
@@ -54,17 +67,22 @@ export default function SideEffectAddPage() {
         body: JSON.stringify(formData)
       });
       
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || 'Failed to add side effect');
+        const errorMessage = responseData.error || 'Failed to add side effect';
+        console.error('Server error:', errorMessage);
+        throw new Error(errorMessage);
       }
       
       navigate('/side-effects');
     } catch (err) {
       console.error('Error adding side effect:', err);
       Sentry.captureException(err);
-      setError('Failed to add side effect. Please try again.');
+      setError(err.message || 'Failed to add side effect. Please try again.');
       throw err; // Re-throw to let the form component handle it
+    } finally {
+      setSubmitting(false);
     }
   };
   
@@ -86,17 +104,15 @@ export default function SideEffectAddPage() {
       <div>
         <h1 className="text-2xl font-bold mb-6">Record Side Effect</h1>
         
-        <div className="bg-yellow-50 text-yellow-700 p-4 rounded-md mb-6">
-          <p>You need to add medications before you can record side effects.</p>
-        </div>
-        
-        <div className="text-center">
-          <button 
-            onClick={() => navigate('/medications/add')}
-            className="btn-primary cursor-pointer"
+        <div className="bg-yellow-50 text-yellow-700 p-6 rounded-lg shadow-md mb-6">
+          <h2 className="text-lg font-semibold mb-2">No Medications Found</h2>
+          <p className="mb-4">You need to add at least one medication before you can record side effects.</p>
+          <Link 
+            to="/medications/add"
+            className="btn-primary cursor-pointer inline-block"
           >
             Add Your First Medication
-          </button>
+          </Link>
         </div>
       </div>
     );

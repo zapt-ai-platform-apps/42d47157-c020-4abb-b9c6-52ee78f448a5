@@ -49,16 +49,28 @@ export default async function handler(req, res) {
       console.log(`Creating new side effect: ${symptom} for user: ${user.id}, medication: ${medicationId}`);
       
       if (!medicationId || !symptom || !severity || !timeOfDay || !date) {
+        console.error('Missing required fields:', { medicationId, symptom, severity, timeOfDay, date });
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Ensure medicationId is a number
+      const medId = Number(medicationId);
+      if (isNaN(medId)) {
+        console.error('Invalid medication ID format:', medicationId);
+        return res.status(400).json({ error: 'Invalid medication ID format' });
+      }
+
+      console.log(`Verifying medication ID ${medId} belongs to user ${user.id}`);
+      
       // Verify medication belongs to user
       const med = await db.select()
         .from(medications)
         .where(and(
-          eq(medications.id, medicationId),
+          eq(medications.id, medId),
           eq(medications.userId, user.id)
         ));
+      
+      console.log(`Found ${med.length} matching medications`);
       
       if (med.length === 0) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });
@@ -67,7 +79,7 @@ export default async function handler(req, res) {
       const result = await db.insert(sideEffects)
         .values({
           userId: user.id,
-          medicationId,
+          medicationId: medId,
           symptom,
           severity,
           timeOfDay,
@@ -89,6 +101,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Ensure medicationId is a number
+      const medId = Number(medicationId);
+      if (isNaN(medId)) {
+        return res.status(400).json({ error: 'Invalid medication ID format' });
+      }
+
+      // Verify medication belongs to user
+      const med = await db.select()
+        .from(medications)
+        .where(and(
+          eq(medications.id, medId),
+          eq(medications.userId, user.id)
+        ));
+      
+      if (med.length === 0) {
+        return res.status(404).json({ error: 'Medication not found or does not belong to user' });
+      }
+      
       // Verify side effect belongs to user
       const existingSideEffect = await db.select()
         .from(sideEffects)
@@ -103,7 +133,7 @@ export default async function handler(req, res) {
       
       const result = await db.update(sideEffects)
         .set({
-          medicationId,
+          medicationId: medId,
           symptom,
           severity,
           timeOfDay,
@@ -148,5 +178,10 @@ export default async function handler(req, res) {
     console.error('Error in sideEffects API:', error);
     Sentry.captureException(error);
     return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    // Close the database connection
+    if (client) {
+      await client.end();
+    }
   }
 }
