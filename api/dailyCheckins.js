@@ -5,6 +5,20 @@ import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq, and, desc } from 'drizzle-orm';
 
+// Helper function to ensure consistent date handling
+const formatDateForDB = (dateValue) => {
+  if (!dateValue) return null;
+  
+  // If it's already a string in ISO format, return it
+  if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateValue;
+  }
+  
+  // Otherwise, ensure it's converted to YYYY-MM-DD format
+  const date = new Date(dateValue);
+  return date.toISOString().split('T')[0];
+};
+
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/dailyCheckins`);
 
@@ -25,8 +39,8 @@ export default async function handler(req, res) {
       
       if (startDate && endDate) {
         query = query.where(and(
-          dailyCheckins.date >= new Date(startDate),
-          dailyCheckins.date <= new Date(endDate)
+          dailyCheckins.date >= formatDateForDB(startDate),
+          dailyCheckins.date <= formatDateForDB(endDate)
         ));
       }
       
@@ -46,11 +60,12 @@ export default async function handler(req, res) {
       }
 
       // Check if a check-in already exists for this date
+      const formattedDate = formatDateForDB(date);
       const existingCheckin = await db.select()
         .from(dailyCheckins)
         .where(and(
           eq(dailyCheckins.userId, user.id),
-          eq(dailyCheckins.date, new Date(date))
+          eq(dailyCheckins.date, formattedDate)
         ));
       
       if (existingCheckin.length > 0) {
@@ -63,7 +78,7 @@ export default async function handler(req, res) {
       const result = await db.insert(dailyCheckins)
         .values({
           userId: user.id,
-          date: new Date(date),
+          date: formattedDate,
           overallFeeling,
           sleepQuality,
           energyLevel,
@@ -87,7 +102,7 @@ export default async function handler(req, res) {
 
       const result = await db.update(dailyCheckins)
         .set({
-          date: new Date(date),
+          date: formatDateForDB(date),
           overallFeeling,
           sleepQuality,
           energyLevel,
