@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CheckinForm } from '@/modules/dailyCheckins';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function CheckinEditPage() {
   const navigate = useNavigate();
@@ -23,6 +24,8 @@ export default function CheckinEditPage() {
         });
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API response error:', errorText);
           throw new Error('Failed to fetch daily check-ins');
         }
         
@@ -60,7 +63,7 @@ export default function CheckinEditPage() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
         throw new Error(errorData.error || 'Failed to update check-in');
       }
       

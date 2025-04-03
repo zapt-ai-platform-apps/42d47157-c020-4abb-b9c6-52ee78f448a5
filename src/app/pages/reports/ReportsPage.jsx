@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportList } from '@/modules/reports';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function ReportsPage() {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ export default function ReportsPage() {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API response error:', errorText);
         throw new Error('Failed to fetch reports');
       }
       

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ReportViewer } from '@/modules/reports';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function ReportViewPage() {
   const { id } = useParams();
@@ -22,6 +23,8 @@ export default function ReportViewPage() {
         });
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API response error:', errorText);
           throw new Error('Failed to fetch report data');
         }
         

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportForm } from '@/modules/reports';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function ReportCreatePage() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function ReportCreatePage() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
         throw new Error(errorData.error || 'Failed to create report');
       }
       

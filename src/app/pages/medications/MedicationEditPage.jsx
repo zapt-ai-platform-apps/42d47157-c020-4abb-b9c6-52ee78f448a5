@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MedicationForm } from '@/modules/medications';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function MedicationEditPage() {
   const navigate = useNavigate();
@@ -15,8 +16,6 @@ export default function MedicationEditPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        // Normally you would fetch a single medication by ID, but for this example
-        // we'll fetch all medications and find the one with the matching ID
         const response = await fetch('/api/medications', {
           headers: {
             Authorization: `Bearer ${session?.access_token}`
@@ -24,6 +23,8 @@ export default function MedicationEditPage() {
         });
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API response error:', errorText);
           throw new Error('Failed to fetch medication');
         }
         
@@ -61,7 +62,7 @@ export default function MedicationEditPage() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
         throw new Error(errorData.error || 'Failed to update medication');
       }
       

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MedicationForm } from '@/modules/medications';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function MedicationAddPage() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function MedicationAddPage() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
         throw new Error(errorData.error || 'Failed to add medication');
       }
       

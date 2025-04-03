@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckinList } from '@/modules/dailyCheckins';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function CheckinsPage() {
   const [checkins, setCheckins] = useState([]);
@@ -24,6 +25,8 @@ export default function CheckinsPage() {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API response error:', errorText);
         throw new Error('Failed to fetch daily check-ins');
       }
       

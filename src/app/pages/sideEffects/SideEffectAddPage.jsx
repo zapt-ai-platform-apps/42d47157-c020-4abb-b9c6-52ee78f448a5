@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SideEffectForm } from '@/modules/sideEffects';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function SideEffectAddPage() {
   const navigate = useNavigate();
@@ -21,6 +22,8 @@ export default function SideEffectAddPage() {
         });
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API response error:', errorText);
           throw new Error('Failed to fetch medications');
         }
         
@@ -52,7 +55,7 @@ export default function SideEffectAddPage() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
         throw new Error(errorData.error || 'Failed to add side effect');
       }
       

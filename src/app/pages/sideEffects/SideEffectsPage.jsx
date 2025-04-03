@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { SideEffectList } from '@/modules/sideEffects';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function SideEffectsPage() {
   const [sideEffects, setSideEffects] = useState([]);
@@ -24,6 +25,8 @@ export default function SideEffectsPage() {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API response error:', errorText);
         throw new Error('Failed to fetch side effects');
       }
       

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckinForm } from '@/modules/dailyCheckins';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function CheckinAddPage() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function CheckinAddPage() {
           }
         }
         
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
         throw new Error(errorData.error || 'Failed to add check-in');
       }
       
