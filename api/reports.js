@@ -3,7 +3,8 @@ import postgres from 'postgres';
 import { medications, sideEffects, dailyCheckins, reports } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
-import { eq, and, between, desc } from 'drizzle-orm';
+import { eq, and, between, desc, or } from 'drizzle-orm';
+import { formatDateForDB } from './_dateUtils.js';
 
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/reports`);
@@ -109,8 +110,8 @@ export default async function handler(req, res) {
         .values({
           userId: user.id,
           title,
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
+          startDate: formatDateForDB(startDate),
+          endDate: formatDateForDB(endDate),
         })
         .returning();
 
