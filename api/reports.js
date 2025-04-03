@@ -24,16 +24,41 @@ export default async function handler(req, res) {
       // If data=true, return the full report data for the given ID
       if (id && data === 'true') {
         console.log(`Fetching full report data for report ID: ${id}`);
+        console.log(`Report ID type: ${typeof id}, value: ${id}`);
+        
+        let reportId;
+        try {
+          // For large IDs, use BigInt first, then convert back
+          // This helps preserve precision for large values
+          reportId = Number(BigInt(id));
+          console.log(`Parsed report ID using BigInt->Number: ${reportId}`);
+          
+          // Check if precision was lost in conversion
+          if (reportId.toString() !== id) {
+            console.warn(`Precision issue detected: ${reportId} !== ${id}`);
+            
+            // Use string comparison as fallback if available in your DB driver
+            console.log(`Using string value directly: ${id}`);
+            reportId = id; // Try using string directly
+          }
+        } catch (error) {
+          console.error(`Error parsing report ID: ${id}`, error);
+          Sentry.captureException(error);
+          return res.status(400).json({ error: 'Invalid report ID format' });
+        }
 
         // Get the report details
         const reportDetails = await db.select()
           .from(reports)
           .where(and(
-            eq(reports.id, parseInt(id)),
+            eq(reports.id, reportId),
             eq(reports.userId, user.id)
           ));
+        
+        console.log(`Query returned ${reportDetails.length} reports for ID: ${reportId}`);
 
         if (reportDetails.length === 0) {
+          console.log(`No report found with ID ${reportId} for user ${user.id}`);
           return res.status(404).json({ error: 'Report not found' });
         }
 
@@ -81,6 +106,7 @@ export default async function handler(req, res) {
           medicationName: row.medicationName
         }));
 
+        console.log(`Successfully assembled report data for ID: ${reportId}`);
         return res.status(200).json({
           report,
           medications: medicationsList,
@@ -132,12 +158,19 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Parse the ID and handle potential NaN values
-        const reportId = parseInt(id);
-        console.log(`Parsed report ID: ${reportId}`);
-        
-        if (isNaN(reportId)) {
-          console.error(`Invalid report ID format: ${id}`);
+        // Use BigInt for parsing to handle large IDs
+        let reportId;
+        try {
+          reportId = Number(BigInt(id));
+          console.log(`Parsed report ID: ${reportId}`);
+          
+          // Check if precision was lost in conversion
+          if (reportId.toString() !== id) {
+            console.warn(`Precision issue detected: ${reportId} !== ${id}`);
+            reportId = id; // Try using string directly
+          }
+        } catch (error) {
+          console.error(`Error parsing report ID: ${id}`, error);
           return res.status(400).json({ error: 'Invalid report ID format' });
         }
 

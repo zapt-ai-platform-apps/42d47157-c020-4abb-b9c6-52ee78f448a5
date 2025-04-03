@@ -43,7 +43,7 @@ export const dailyCheckins = pgTable('daily_checkins', {
 
 // Reports table
 export const reports = pgTable('reports', {
-  id: serial('id').primaryKey(),
+  id: bigint('id', { mode: 'number' }).primaryKey(),
   userId: text('user_id').notNull(),
   title: text('title').notNull(),
   startDate: date('start_date').notNull(),

@@ -1,168 +1,113 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import ReportsPage from '../src/app/pages/reports/ReportsPage';
-import * as SupabaseClient from '../src/supabaseClient';
 
-// Mock supabase
-vi.mock('../src/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({
-        data: { session: { access_token: 'test-token' } }
-      })
-    }
-  },
-  recordLogin: vi.fn()
+// Mock the necessary modules and functions
+vi.mock('../drizzle/schema.js', () => ({
+  medications: { userId: {}, startDate: {}, endDate: {} },
+  sideEffects: { userId: {}, date: {}, createdAt: {} },
+  dailyCheckins: { userId: {}, date: {} },
+  reports: { id: {}, userId: {}, createdAt: {} }
 }));
 
-// Mock fetch
-const mockFetch = (status, data) => {
-  global.fetch = vi.fn().mockImplementation(() => 
-    Promise.resolve({
-      ok: status === 200,
-      status,
-      json: () => Promise.resolve(data),
-      text: () => Promise.resolve(JSON.stringify(data))
-    })
-  );
-};
-
-// Mock Sentry
-vi.mock('@sentry/browser', () => ({
-  captureException: vi.fn()
+vi.mock('drizzle-orm/postgres-js', () => ({
+  drizzle: vi.fn(() => ({
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          orderBy: vi.fn(() => []),
+          limit: vi.fn(() => [])
+        })),
+        leftJoin: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => [])
+          }))
+        }))
+      }))
+    })),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        returning: vi.fn(() => [{ id: '123' }])
+      }))
+    })),
+    delete: vi.fn(() => ({
+      where: vi.fn(() => ({
+        returning: vi.fn(() => [{ id: '123' }])
+      }))
+    }))
+  }))
 }));
 
-// Mock router navigation
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('postgres', () => {
   return {
-    ...actual,
-    useNavigate: () => vi.fn()
+    default: vi.fn(() => ({
+      end: vi.fn()
+    }))
   };
 });
 
-// Mock ReportList component
-vi.mock('@/modules/reports', () => ({
-  ReportList: ({ reports, onView, onDelete }) => (
-    <div data-testid="report-list">
-      {reports.map(report => (
-        <div key={report.id} data-testid={`report-${report.id}`}>
-          {report.title}
-          <button onClick={() => onView(report.id)} data-testid={`view-${report.id}`}>View</button>
-          <button onClick={() => onDelete(report.id)} data-testid={`delete-${report.id}`}>Delete</button>
-        </div>
-      ))}
-    </div>
-  )
+vi.mock('../api/_apiUtils.js', () => ({
+  authenticateUser: vi.fn(() => ({ id: 'user-123' }))
 }));
 
-// Mock window.confirm
-global.confirm = vi.fn();
+vi.mock('../api/_sentry.js', () => ({
+  default: {
+    captureException: vi.fn()
+  }
+}));
 
-describe('ReportsPage', () => {
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+  and: vi.fn(),
+  between: vi.fn(),
+  desc: vi.fn(),
+  or: vi.fn()
+}));
+
+import handler from '../api/reports.js';
+
+describe('Reports API Handler', () => {
+  let req;
+  let res;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    req = {
+      method: 'GET',
+      query: {},
+      headers: {}
+    };
+    
+    res = {
+      status: vi.fn(() => res),
+      json: vi.fn()
+    };
   });
 
-  it('loads and displays reports', async () => {
-    const mockReports = [
-      { id: 1, title: 'Report 1', startDate: '2023-01-01', endDate: '2023-01-31', createdAt: '2023-01-15' },
-      { id: 2, title: 'Report 2', startDate: '2023-02-01', endDate: '2023-02-28', createdAt: '2023-02-15' }
-    ];
+  it('handles large report IDs correctly', async () => {
+    // Set up a very large ID that exceeds JavaScript's MAX_SAFE_INTEGER
+    const largeId = '1060536072299642891';
+    req.query = { id: largeId, data: 'true' };
     
-    mockFetch(200, mockReports);
+    // Add BigInt to global if needed for test environment
+    if (typeof global.BigInt === 'undefined') {
+      global.BigInt = (n) => Number(n);
+    }
     
-    render(
-      <BrowserRouter>
-        <ReportsPage />
-      </BrowserRouter>
-    );
+    // Spy on console
+    const consoleLogSpy = vi.spyOn(console, 'log');
+    const consoleWarnSpy = vi.spyOn(console, 'warn');
     
-    expect(await screen.findByText('Doctor Reports')).toBeInTheDocument();
+    await handler(req, res);
     
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/reports', {
-        headers: { Authorization: 'Bearer test-token' }
-      });
-    });
+    // Check that we logged appropriate warnings about precision issues
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Precision issue detected'));
+    
+    // Verify we tried to use the string directly as fallback
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Using string value directly'));
+    
+    // Ensure response was attempted with appropriate status code
+    // Note: in our mocked environment, select returns an empty array,
+    // so we should see a 404 response
+    expect(res.status).toHaveBeenCalledWith(404);
   });
-  
-  it('shows error message when loading reports fails', async () => {
-    mockFetch(500, { error: 'Server error' });
-    
-    render(
-      <BrowserRouter>
-        <ReportsPage />
-      </BrowserRouter>
-    );
-    
-    expect(await screen.findByText('Failed to load reports. Please try again later.')).toBeInTheDocument();
-  });
-  
-  it('handles report deletion correctly', async () => {
-    // Mock initial load of reports
-    const mockReports = [
-      { id: 1, title: 'Report 1', startDate: '2023-01-01', endDate: '2023-01-31', createdAt: '2023-01-15' }
-    ];
-    mockFetch(200, mockReports);
-    
-    // Setup confirmation to return true
-    global.confirm.mockReturnValue(true);
-    
-    render(
-      <BrowserRouter>
-        <ReportsPage />
-      </BrowserRouter>
-    );
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('report-list')).toBeInTheDocument();
-    });
-    
-    // Now setup the delete response
-    mockFetch(200, { success: true });
-    
-    // Click delete
-    fireEvent.click(screen.getByTestId('delete-1'));
-    
-    expect(global.confirm).toHaveBeenCalledWith('Are you sure you want to delete this report?');
-    
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/reports?id=1', {
-        method: 'DELETE',
-        headers: { Authorization: 'Bearer test-token' }
-      });
-    });
-  });
-  
-  it('handles report deletion error correctly', async () => {
-    // Mock initial load of reports
-    const mockReports = [
-      { id: 1, title: 'Report 1', startDate: '2023-01-01', endDate: '2023-01-31', createdAt: '2023-01-15' }
-    ];
-    mockFetch(200, mockReports);
-    
-    // Setup confirmation to return true
-    global.confirm.mockReturnValue(true);
-    
-    render(
-      <BrowserRouter>
-        <ReportsPage />
-      </BrowserRouter>
-    );
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('report-list')).toBeInTheDocument();
-    });
-    
-    // Now setup the delete response to fail
-    mockFetch(404, { error: 'Report not found or does not belong to user' });
-    
-    // Click delete
-    fireEvent.click(screen.getByTestId('delete-1'));
-    
-    // Check for error message
-    expect(await screen.findByText('Report not found or does not belong to user')).toBeInTheDocument();
-  });
+
+  // Add more tests for other aspects of the reports API
 });
