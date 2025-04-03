@@ -79,6 +79,11 @@ describe('Reports API Handler', () => {
       status: vi.fn(() => res),
       json: vi.fn()
     };
+    
+    // Reset console mocks
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('handles large report IDs correctly', async () => {
@@ -93,20 +98,34 @@ describe('Reports API Handler', () => {
     
     // Spy on console
     const consoleLogSpy = vi.spyOn(console, 'log');
-    const consoleWarnSpy = vi.spyOn(console, 'warn');
     
     await handler(req, res);
     
-    // Check that we logged appropriate warnings about precision issues
-    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Precision issue detected'));
+    // Verify we used the string directly
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Using string value directly for report ID'));
     
-    // Verify we tried to use the string directly as fallback
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Using string value directly'));
-    
-    // Ensure response was attempted with appropriate status code
-    // Note: in our mocked environment, select returns an empty array,
-    // so we should see a 404 response
+    // Ensure we tried to query with the string ID
+    // Note: since our mock returns empty, we expect a 404
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+  
+  it('handles valid report ID format but non-existent report', async () => {
+    req.query = { id: '123', data: 'true' };
+    
+    await handler(req, res);
+    
+    // Our mock returns empty array, so should get 404
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Report not found' });
+  });
+  
+  it('rejects invalid report ID format', async () => {
+    req.query = { id: 'not-a-number', data: 'true' };
+    
+    await handler(req, res);
+    
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Invalid report ID format' });
   });
 
   // Add more tests for other aspects of the reports API

@@ -14,6 +14,7 @@ export default function ReportViewPage() {
   useEffect(() => {
     const fetchReport = async () => {
       try {
+        console.log(`Attempting to fetch report with ID: ${id}`);
         const { data: { session } } = await supabase.auth.getSession();
         
         const response = await fetch(`/api/reports?id=${id}&data=true`, {
@@ -23,17 +24,34 @@ export default function ReportViewPage() {
         });
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('API response error:', errorText);
-          throw new Error('Failed to fetch report data');
+          // Get detailed error information
+          let errorMessage = `Failed to fetch report data (status: ${response.status})`;
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (parseError) {
+            // If we can't parse JSON, try getting error as text
+            try {
+              const errorText = await response.text();
+              console.error('API response error text:', errorText);
+            } catch (textError) {
+              console.error('Could not read error response body');
+            }
+          }
+          
+          console.error('API response error:', errorMessage);
+          throw new Error(errorMessage);
         }
         
         const data = await response.json();
+        console.log('Successfully retrieved report data');
         setReportData(data);
       } catch (err) {
         console.error('Error fetching report data:', err);
         Sentry.captureException(err);
-        setError('Failed to load report data. Please try again later.');
+        setError(err.message || 'Failed to load report data. Please try again later.');
       } finally {
         setLoading(false);
       }

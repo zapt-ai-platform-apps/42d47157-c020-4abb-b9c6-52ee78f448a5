@@ -28,19 +28,12 @@ export default async function handler(req, res) {
         
         let reportId;
         try {
-          // For large IDs, use BigInt first, then convert back
-          // This helps preserve precision for large values
-          reportId = Number(BigInt(id));
-          console.log(`Parsed report ID using BigInt->Number: ${reportId}`);
+          // For large IDs, just validate the format without conversion
+          BigInt(id); // This validates it's a valid numeric string
           
-          // Check if precision was lost in conversion
-          if (reportId.toString() !== id) {
-            console.warn(`Precision issue detected: ${reportId} !== ${id}`);
-            
-            // Use string comparison as fallback if available in your DB driver
-            console.log(`Using string value directly: ${id}`);
-            reportId = id; // Try using string directly
-          }
+          // Use the string ID directly to avoid any precision loss
+          reportId = id;
+          console.log(`Using string value directly for report ID: ${reportId}`);
         } catch (error) {
           console.error(`Error parsing report ID: ${id}`, error);
           Sentry.captureException(error);
@@ -158,17 +151,13 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Use BigInt for parsing to handle large IDs
+        // Use string ID directly to avoid precision issues
         let reportId;
         try {
-          reportId = Number(BigInt(id));
-          console.log(`Parsed report ID: ${reportId}`);
-          
-          // Check if precision was lost in conversion
-          if (reportId.toString() !== id) {
-            console.warn(`Precision issue detected: ${reportId} !== ${id}`);
-            reportId = id; // Try using string directly
-          }
+          // Just validate the format
+          BigInt(id);
+          reportId = id; // Use string directly
+          console.log(`Using string directly for report ID: ${reportId}`);
         } catch (error) {
           console.error(`Error parsing report ID: ${id}`, error);
           return res.status(400).json({ error: 'Invalid report ID format' });
