@@ -34,14 +34,18 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Ensure dates are properly formatted as strings
+      const formattedStartDate = ensureDateString(startDate);
+      const formattedEndDate = endDate ? ensureDateString(endDate) : null;
+
       const result = await db.insert(medications)
         .values({
           userId: user.id,
           name,
           dosage,
           frequency,
-          startDate: startDate, // Use the string directly instead of creating a Date object
-          endDate: endDate || null, // Use the string directly or null
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
           notes,
         })
         .returning();
@@ -59,6 +63,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Ensure dates are properly formatted as strings
+      const formattedStartDate = ensureDateString(startDate);
+      const formattedEndDate = endDate ? ensureDateString(endDate) : null;
+
       // Get current timestamp as ISO string for updatedAt
       const now = new Date().toISOString();
 
@@ -67,10 +75,10 @@ export default async function handler(req, res) {
           name,
           dosage,
           frequency,
-          startDate: startDate, // Use the string directly instead of creating a Date object
-          endDate: endDate || null, // Use the string directly or null
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
           notes,
-          updatedAt: now, // Use ISO string format
+          updatedAt: now,
         })
         .where(eq(medications.id, id))
         .returning();
@@ -110,5 +118,38 @@ export default async function handler(req, res) {
     console.error('Error in medications API:', error);
     Sentry.captureException(error);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * Ensures a date value is properly formatted as a string
+ * Handles both Date objects and string inputs
+ * 
+ * @param {Date|string} date - The date to format
+ * @returns {string} The date formatted as a string in YYYY-MM-DD format
+ */
+function ensureDateString(date) {
+  if (date instanceof Date) {
+    // If it's a Date object, convert to ISO string and take just the YYYY-MM-DD part
+    return date.toISOString().split('T')[0];
+  } else if (typeof date === 'string') {
+    // If it's already a string, make sure it's in the right format
+    // Try to create a Date object and convert back to ensure consistent format
+    try {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        // Invalid date string
+        throw new Error(`Invalid date string: ${date}`);
+      }
+      return dateObj.toISOString().split('T')[0];
+    } catch (error) {
+      console.error(`Error formatting date string: ${date}`, error);
+      // Return the original string if we can't parse it
+      // The database will reject it if it's in the wrong format
+      return date;
+    }
+  } else {
+    // If it's neither a Date nor a string, throw an error
+    throw new Error(`Date must be a Date object or string, received: ${typeof date}`);
   }
 }
