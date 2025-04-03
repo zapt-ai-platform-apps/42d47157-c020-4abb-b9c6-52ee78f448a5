@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         .orderBy(desc(sideEffects.date), desc(sideEffects.createdAt));
       
       if (medicationId) {
-        query = query.where(eq(sideEffects.medicationId, parseInt(medicationId)));
+        query = query.where(eq(sideEffects.medicationId, BigInt(medicationId)));
       }
       
       const result = await query;
@@ -57,33 +57,34 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      // Ensure medicationId is a number
-      const medId = Number(medicationId);
-      if (isNaN(medId)) {
-        console.error('Invalid medication ID format:', medicationId);
-        return res.status(400).json({ error: 'Invalid medication ID format' });
-      }
-
-      console.log(`Verifying medication ID ${medId} belongs to user ${user.id}`);
+      // Convert medicationId to string first to avoid any potential number format issues
+      const medIdStr = String(medicationId);
+      console.log(`Processing medication ID as string: ${medIdStr}`);
       
-      // Verify medication belongs to user
-      const med = await db.select()
-        .from(medications)
-        .where(and(
-          eq(medications.id, medId),
-          eq(medications.userId, user.id)
-        ));
+      // Use database's native equality comparison rather than JavaScript's
+      console.log(`Verifying medication ID ${medIdStr} belongs to user ${user.id}`);
       
-      console.log(`Found ${med.length} matching medications`);
+      // Verify medication belongs to user using raw SQL for ID comparison
+      // This avoids JavaScript number precision issues
+      const medQuery = `
+        SELECT id FROM medications 
+        WHERE id = $1 AND user_id = $2
+      `;
       
-      if (med.length === 0) {
+      const medResult = await client.query(medQuery, [medIdStr, user.id]);
+      console.log(`Found ${medResult.count} matching medications`);
+      
+      if (medResult.count === 0) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });
       }
+      
+      // Use the medication ID from the database to ensure accuracy
+      const verifiedMedId = medResult[0].id;
       
       const result = await db.insert(sideEffects)
         .values({
           userId: user.id,
-          medicationId: medId,
+          medicationId: verifiedMedId,
           symptom,
           severity,
           timeOfDay,
@@ -105,23 +106,23 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      // Ensure medicationId is a number
-      const medId = Number(medicationId);
-      if (isNaN(medId)) {
-        return res.status(400).json({ error: 'Invalid medication ID format' });
-      }
-
-      // Verify medication belongs to user
-      const med = await db.select()
-        .from(medications)
-        .where(and(
-          eq(medications.id, medId),
-          eq(medications.userId, user.id)
-        ));
+      // Convert medicationId to string to avoid number precision issues
+      const medIdStr = String(medicationId);
       
-      if (med.length === 0) {
+      // Verify medication belongs to user using raw SQL
+      const medQuery = `
+        SELECT id FROM medications 
+        WHERE id = $1 AND user_id = $2
+      `;
+      
+      const medResult = await client.query(medQuery, [medIdStr, user.id]);
+      
+      if (medResult.count === 0) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });
       }
+      
+      // Use the medication ID from the database to ensure accuracy
+      const verifiedMedId = medResult[0].id;
       
       // Verify side effect belongs to user
       const existingSideEffect = await db.select()
@@ -137,7 +138,7 @@ export default async function handler(req, res) {
       
       const result = await db.update(sideEffects)
         .set({
-          medicationId: medId,
+          medicationId: verifiedMedId,
           symptom,
           severity,
           timeOfDay,

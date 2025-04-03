@@ -57,13 +57,15 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
       }
       
       // Make the API call to create/update the side effect
+      // Important: Pass medicationId as a string to avoid number precision issues
       const payload = {
         ...formData,
-        medicationId: Number(formData.medicationId), // Ensure it's a number
+        // Preserve the original string ID value to prevent number precision issues
+        medicationId: String(formData.medicationId),
         severity: parseInt(formData.severity)
       };
       
-      console.log('Submitting side effect with medication ID:', payload.medicationId);
+      console.log('Submitting side effect with medication ID (as string):', payload.medicationId);
       await onSubmit(payload);
     } catch (err) {
       console.error('Error saving side effect:', err);

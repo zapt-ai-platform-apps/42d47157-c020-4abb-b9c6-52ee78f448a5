@@ -8,9 +8,11 @@ import { eq } from 'drizzle-orm';
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/medications`);
 
+  let client = null;
+
   try {
     const user = await authenticateUser(req);
-    const client = postgres(process.env.COCKROACH_DB_URL);
+    client = postgres(process.env.COCKROACH_DB_URL);
     const db = drizzle(client);
 
     // GET request - retrieve medications
@@ -21,7 +23,8 @@ export default async function handler(req, res) {
         .where(eq(medications.userId, user.id))
         .orderBy(medications.createdAt);
 
-      console.log(`Found ${result.length} medications`);
+      // Log medication IDs to help with debugging
+      console.log(`Found ${result.length} medications with IDs: ${result.map(med => med.id).join(', ')}`);
       return res.status(200).json(result);
     }
     
@@ -118,6 +121,10 @@ export default async function handler(req, res) {
     console.error('Error in medications API:', error);
     Sentry.captureException(error);
     return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    if (client) {
+      await client.end();
+    }
   }
 }
 

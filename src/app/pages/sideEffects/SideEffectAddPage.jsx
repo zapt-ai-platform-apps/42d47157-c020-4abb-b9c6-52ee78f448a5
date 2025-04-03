@@ -29,7 +29,7 @@ export default function SideEffectAddPage() {
         }
         
         const data = await response.json();
-        console.log(`Fetched ${data.length} medications`);
+        console.log(`Fetched ${data.length} medications with IDs:`, data.map(med => med.id));
         setMedications(data);
       } catch (err) {
         console.error('Error fetching medications:', err);
@@ -54,7 +54,7 @@ export default function SideEffectAddPage() {
         throw new Error('Please select a medication');
       }
       
-      console.log('Submitting side effect with medication ID:', formData.medicationId);
+      console.log('Submitting side effect with medication ID (from form):', formData.medicationId);
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -67,20 +67,20 @@ export default function SideEffectAddPage() {
         body: JSON.stringify(formData)
       });
       
-      const responseData = await response.json();
-      
       if (!response.ok) {
+        const responseData = await response.json();
         const errorMessage = responseData.error || 'Failed to add side effect';
         console.error('Server error:', errorMessage);
         throw new Error(errorMessage);
       }
       
+      const data = await response.json();
+      console.log('Successfully added side effect:', data);
       navigate('/side-effects');
     } catch (err) {
       console.error('Error adding side effect:', err);
       Sentry.captureException(err);
       setError(err.message || 'Failed to add side effect. Please try again.');
-      throw err; // Re-throw to let the form component handle it
     } finally {
       setSubmitting(false);
     }
