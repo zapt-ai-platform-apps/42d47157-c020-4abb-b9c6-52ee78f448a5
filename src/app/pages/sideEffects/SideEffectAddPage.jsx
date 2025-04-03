@@ -54,7 +54,21 @@ export default function SideEffectAddPage() {
         throw new Error('Please select a medication');
       }
       
-      console.log('Submitting side effect with medication ID (from form):', formData.medicationId);
+      console.log('Submitting side effect with medication ID (from page):', formData.medicationId);
+      console.log('Medication ID type:', typeof formData.medicationId);
+      
+      // Ensure medicationId is a valid string representation of a number
+      if (typeof formData.medicationId !== 'string' && typeof formData.medicationId !== 'number') {
+        console.error('Invalid medication ID type:', typeof formData.medicationId);
+        throw new Error('Invalid medication ID format. Please select a valid medication.');
+      }
+      
+      // Create a safe copy of the form data
+      const safeFormData = {
+        ...formData,
+        medicationId: String(formData.medicationId),
+        severity: Number(formData.severity)
+      };
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -64,7 +78,7 @@ export default function SideEffectAddPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(safeFormData)
       });
       
       if (!response.ok) {

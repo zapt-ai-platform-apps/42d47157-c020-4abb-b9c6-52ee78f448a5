@@ -51,7 +51,8 @@ export default async function handler(req, res) {
     // POST request - create a new side effect
     if (req.method === 'POST') {
       const { medicationId, symptom, severity, timeOfDay, date, notes } = req.body;
-      console.log(`Creating new side effect: ${symptom} for user: ${user.id}, medication: ${medicationId}`);
+      console.log(`Creating new side effect: ${symptom} for user: ${user.id}, medication:`, medicationId);
+      console.log('Medication ID type:', typeof medicationId, 'Value:', medicationId);
       
       if (!medicationId || !symptom || !severity || !timeOfDay || !date) {
         console.error('Missing required fields:', { medicationId, symptom, severity, timeOfDay, date });
@@ -59,9 +60,29 @@ export default async function handler(req, res) {
       }
 
       try {
+        // Check if medicationId is a date object or non-convertible type
+        if (medicationId instanceof Date || 
+            (typeof medicationId === 'object' && medicationId !== null && 
+             'toISOString' in medicationId)) {
+          console.error('Invalid medication ID: Received a Date object instead of a string or number');
+          return res.status(400).json({ 
+            error: 'Invalid medication ID format. Please select a valid medication.' 
+          });
+        }
+        
         // Convert medicationId to string first to avoid any potential number format issues
         const medIdStr = String(medicationId);
         console.log(`Processing medication ID as string: ${medIdStr}`);
+        
+        // Validate that the ID can be converted to a BigInt
+        try {
+          BigInt(medIdStr);
+        } catch (err) {
+          console.error('Failed to convert medication ID to BigInt:', err);
+          return res.status(400).json({
+            error: 'Invalid medication ID format. Please select a valid medication.'
+          });
+        }
         
         // Use database query with properly typed BigInt
         const medResult = await db.select()
@@ -103,14 +124,35 @@ export default async function handler(req, res) {
     if (req.method === 'PUT') {
       const { id, medicationId, symptom, severity, timeOfDay, date, notes } = req.body;
       console.log(`Updating side effect ID: ${id} for user: ${user.id}`);
+      console.log('Medication ID type:', typeof medicationId, 'Value:', medicationId);
       
       if (!id || !medicationId || !symptom || !severity || !timeOfDay || !date) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
       try {
+        // Check if medicationId is a date object or non-convertible type
+        if (medicationId instanceof Date || 
+            (typeof medicationId === 'object' && medicationId !== null && 
+             'toISOString' in medicationId)) {
+          console.error('Invalid medication ID: Received a Date object instead of a string or number');
+          return res.status(400).json({ 
+            error: 'Invalid medication ID format. Please select a valid medication.' 
+          });
+        }
+        
         // Convert medicationId to string to avoid number precision issues
         const medIdStr = String(medicationId);
+        
+        // Validate that the ID can be converted to a BigInt
+        try {
+          BigInt(medIdStr);
+        } catch (err) {
+          console.error('Failed to convert medication ID to BigInt:', err);
+          return res.status(400).json({
+            error: 'Invalid medication ID format. Please select a valid medication.'
+          });
+        }
         
         // Verify medication belongs to user using properly typed BigInt
         const medResult = await db.select()

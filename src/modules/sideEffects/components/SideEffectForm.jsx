@@ -57,18 +57,40 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
       }
       
       // Make the API call to create/update the side effect
-      // Important: Pass medicationId as a string to avoid number precision issues
+      // Ensure medicationId is a valid string representation of a number
+      let medicationIdStr;
+      try {
+        // First check if it's already a string
+        if (typeof formData.medicationId === 'string') {
+          medicationIdStr = formData.medicationId;
+        } else if (typeof formData.medicationId === 'number') {
+          medicationIdStr = String(formData.medicationId);
+        } else {
+          throw new Error('Invalid medication ID format');
+        }
+        
+        // Verify it can be parsed as a number
+        if (isNaN(Number(medicationIdStr))) {
+          throw new Error('Medication ID is not a valid number');
+        }
+      } catch (err) {
+        console.error('Invalid medication ID:', formData.medicationId, err);
+        setError('Invalid medication ID format. Please select a valid medication.');
+        return;
+      }
+      
       const payload = {
         ...formData,
-        // Preserve the original string ID value to prevent number precision issues
-        medicationId: String(formData.medicationId),
+        medicationId: medicationIdStr,
         severity: parseInt(formData.severity)
       };
       
       console.log('Submitting side effect with medication ID (as string):', payload.medicationId);
+      console.log('Full payload:', payload);
       await onSubmit(payload);
     } catch (err) {
       console.error('Error saving side effect:', err);
+      Sentry.captureException(err);
       setError(err.message || 'Failed to save side effect. Please try again.');
     } finally {
       setLoading(false);

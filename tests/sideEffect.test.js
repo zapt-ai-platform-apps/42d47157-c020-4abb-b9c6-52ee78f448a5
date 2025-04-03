@@ -31,11 +31,11 @@ vi.mock('../drizzle/schema.js', () => ({
   medications: { id: 'id', name: 'name' }
 }));
 
-vi.mock('./_apiUtils.js', () => ({
+vi.mock('../api/_apiUtils.js', () => ({
   authenticateUser: vi.fn(() => ({ id: 'user123' }))
 }));
 
-vi.mock('./_sentry.js', () => ({
+vi.mock('../api/_sentry.js', () => ({
   default: { captureException: vi.fn() }
 }));
 
@@ -94,5 +94,34 @@ describe('Side Effects API Handler', () => {
     // Verify that BigInt was used to handle the large ID
     expect(BigInt).toHaveBeenCalledWith('1060514617554862091');
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+  
+  it('should reject a date value as medication ID', async () => {
+    // Arrange
+    const req = {
+      method: 'POST',
+      body: {
+        medicationId: new Date(), // This should be rejected
+        symptom: 'Headache',
+        severity: 5,
+        timeOfDay: 'Morning',
+        date: '2023-05-15',
+        notes: 'Test notes'
+      }
+    };
+    
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    // Act
+    await handler(req, res);
+
+    // Assert
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
+      error: expect.stringContaining('Invalid medication ID format') 
+    }));
   });
 });
