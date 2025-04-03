@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
 import { format } from 'date-fns';
 import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function DashboardPage() {
   const { user } = useAuthContext();

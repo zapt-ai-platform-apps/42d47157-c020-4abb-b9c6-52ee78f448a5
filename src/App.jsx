@@ -10,6 +10,7 @@ import Layout from './app/components/Layout';
 import {
   DashboardPage,
   LoginPage,
+  LandingPage,
   MedicationsPage,
   MedicationAddPage,
   MedicationEditPage,
@@ -29,6 +30,11 @@ export default function App() {
     <AuthProvider>
       <Routes>
         {/* Public routes */}
+        <Route path="/" element={
+          <PublicRoute>
+            <LandingPage />
+          </PublicRoute>
+        } />
         <Route path="/login" element={
           <PublicRoute>
             <LoginPage />
@@ -36,14 +42,6 @@ export default function App() {
         } />
 
         {/* Protected routes */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout>
-              <Navigate to="/dashboard" replace />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Layout>
@@ -144,8 +142,10 @@ export default function App() {
           </ProtectedRoute>
         } />
         
-        {/* Redirect all other routes to dashboard */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Redirect all other routes to home or dashboard */}
+        <Route path="*" element={
+          <Navigate to="/" replace />
+        } />
       </Routes>
     </AuthProvider>
   );
