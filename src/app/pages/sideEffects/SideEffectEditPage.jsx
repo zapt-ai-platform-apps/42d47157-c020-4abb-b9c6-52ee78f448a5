@@ -4,6 +4,28 @@ import { SideEffectForm } from '@/modules/sideEffects';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
 
+// Helper function to sanitize medication IDs
+const sanitizeMedicationId = (id) => {
+  // Check for Date objects
+  if (id instanceof Date || 
+      (typeof id === 'object' && id !== null && 'toISOString' in id)) {
+    console.error('Found Date object as medication ID:', id);
+    Sentry.captureException(new Error(`Date object received as medication ID: ${id}`));
+    // Return a random string ID as fallback
+    return String(Date.now());
+  }
+  
+  // Ensure ID is a string or number
+  if (typeof id !== 'string' && typeof id !== 'number') {
+    console.error('Invalid medication ID type:', typeof id);
+    Sentry.captureException(new Error(`Invalid medication ID type: ${typeof id}`));
+    return String(Math.floor(Math.random() * 1000000));
+  }
+  
+  // Return as string for consistency
+  return String(id);
+};
+
 export default function SideEffectEditPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -31,7 +53,14 @@ export default function SideEffectEditPage() {
         }
         
         const medsData = await medsResponse.json();
-        setMedications(medsData);
+        
+        // Sanitize all medication IDs
+        const sanitizedMedications = medsData.map(med => ({
+          ...med,
+          id: sanitizeMedicationId(med.id)
+        }));
+        
+        setMedications(sanitizedMedications);
         
         // Fetch all side effects and find the one with the matching ID
         const effectsResponse = await fetch('/api/sideEffects', {
@@ -53,7 +82,14 @@ export default function SideEffectEditPage() {
           throw new Error('Side effect not found');
         }
         
-        setSideEffect(effect);
+        // Sanitize the side effect's medication ID
+        const sanitizedEffect = {
+          ...effect,
+          medicationId: sanitizeMedicationId(effect.medicationId)
+        };
+        
+        console.log('Sanitized side effect medication ID:', sanitizedEffect.medicationId);
+        setSideEffect(sanitizedEffect);
       } catch (err) {
         console.error('Error fetching data:', err);
         Sentry.captureException(err);
@@ -68,6 +104,15 @@ export default function SideEffectEditPage() {
   
   const handleSubmit = async (formData) => {
     try {
+      // Sanitize the medicationId one more time before submission
+      const sanitizedFormData = {
+        ...formData,
+        medicationId: sanitizeMedicationId(formData.medicationId),
+        severity: Number(formData.severity)
+      };
+      
+      console.log('Submitting updated side effect with medication ID:', sanitizedFormData.medicationId);
+      
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch('/api/sideEffects', {
@@ -76,7 +121,7 @@ export default function SideEffectEditPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(sanitizedFormData)
       });
       
       if (!response.ok) {

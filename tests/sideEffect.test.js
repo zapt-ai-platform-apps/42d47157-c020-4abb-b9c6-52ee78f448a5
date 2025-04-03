@@ -153,4 +153,65 @@ describe('Side Effects API Handler', () => {
       error: expect.stringContaining('Invalid medication ID format') 
     }));
   });
+  
+  it('should validate string medication IDs correctly', async () => {
+    // Arrange
+    const req = {
+      method: 'POST',
+      body: {
+        medicationId: '1234567890', // Valid string ID
+        symptom: 'Headache',
+        severity: 5,
+        timeOfDay: 'Morning',
+        date: '2023-05-15',
+        notes: 'Test notes'
+      }
+    };
+    
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    // Act
+    await handler(req, res);
+
+    // Assert
+    expect(BigInt).toHaveBeenCalledWith('1234567890');
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+  
+  it('should reject non-numeric string medication IDs', async () => {
+    // Arrange
+    const req = {
+      method: 'POST',
+      body: {
+        medicationId: 'not-a-number', // Invalid string ID
+        symptom: 'Headache',
+        severity: 5,
+        timeOfDay: 'Morning',
+        date: '2023-05-15',
+        notes: 'Test notes'
+      }
+    };
+    
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    // Mock BigInt to throw for non-numeric strings
+    BigInt.mockImplementationOnce(() => {
+      throw new Error('Invalid BigInt value');
+    });
+
+    // Act
+    await handler(req, res);
+
+    // Assert
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
+      error: expect.stringContaining('Invalid medication ID format') 
+    }));
+  });
 });

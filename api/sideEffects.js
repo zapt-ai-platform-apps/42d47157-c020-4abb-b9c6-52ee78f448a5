@@ -5,6 +5,50 @@ import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq, and, desc } from 'drizzle-orm';
 
+// Helper to validate and sanitize medication IDs
+const validateMedicationId = (medicationId) => {
+  console.log('Validating medication ID:', medicationId, 'Type:', typeof medicationId);
+  
+  // Check for Date objects or other objects
+  if (medicationId instanceof Date || 
+      (typeof medicationId === 'object' && medicationId !== null)) {
+    
+    // Check if it has toISOString method (characteristic of Date objects)
+    if ('toISOString' in medicationId) {
+      console.error('Invalid medication ID: Received a Date object:', medicationId);
+      Sentry.captureException(new Error(`Date object received as medicationId: ${medicationId}`));
+      return { isValid: false, error: 'Invalid medication ID format. Please select a valid medication.' };
+    }
+    
+    // Log details about this object for debugging
+    console.error('Invalid medication ID: Received an object instead of string/number:', 
+                 JSON.stringify(medicationId), 
+                 'Constructor:', medicationId.constructor ? medicationId.constructor.name : 'unknown');
+    
+    return { isValid: false, error: 'Invalid medication ID format. Please select a valid medication.' };
+  }
+  
+  // Validate that it's a string or number
+  if (typeof medicationId !== 'string' && typeof medicationId !== 'number') {
+    console.error('Invalid medication ID type:', typeof medicationId);
+    return { isValid: false, error: 'Invalid medication ID format. Please select a valid medication.' };
+  }
+  
+  // Convert to string and validate
+  const medIdStr = String(medicationId);
+  
+  // Check if it can be converted to a BigInt
+  try {
+    BigInt(medIdStr);
+  } catch (err) {
+    console.error('Failed to convert medication ID to BigInt:', err, 'Original value:', medicationId);
+    Sentry.captureException(err);
+    return { isValid: false, error: 'Invalid medication ID format. Please select a valid medication.' };
+  }
+  
+  return { isValid: true, value: medIdStr };
+};
+
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/sideEffects`);
 
@@ -32,8 +76,14 @@ export default async function handler(req, res) {
         .orderBy(desc(sideEffects.date), desc(sideEffects.createdAt));
       
       if (medicationId) {
+        // Validate medication ID before using it in the query
+        const validation = validateMedicationId(medicationId);
+        if (!validation.isValid) {
+          return res.status(400).json({ error: validation.error });
+        }
+        
         // Use BigInt to ensure proper comparison with the BIGINT column
-        query = query.where(eq(sideEffects.medicationId, BigInt(medicationId)));
+        query = query.where(eq(sideEffects.medicationId, BigInt(validation.value)));
       }
       
       const result = await query;
@@ -59,79 +109,45 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      try {
-        // Enhanced check for Date objects with detailed logging
-        if (medicationId instanceof Date || 
-            (typeof medicationId === 'object' && medicationId !== null)) {
-          
-          // Check if it has toISOString method (characteristic of Date objects)
-          if ('toISOString' in medicationId) {
-            console.error('Invalid medication ID: Received a Date object:', medicationId);
-            Sentry.captureException(new Error(`Date object received as medicationId: ${medicationId}`));
-            return res.status(400).json({ 
-              error: 'Invalid medication ID format. Please select a valid medication.' 
-            });
-          }
-          
-          // Log details about this object for debugging
-          console.error('Invalid medication ID: Received an object instead of string/number:', 
-                       JSON.stringify(medicationId), 
-                       'Constructor:', medicationId.constructor ? medicationId.constructor.name : 'unknown');
-          
-          return res.status(400).json({ 
-            error: 'Invalid medication ID format. Please select a valid medication.' 
-          });
-        }
-        
-        // Convert medicationId to string first to avoid any potential number format issues
-        const medIdStr = String(medicationId);
-        console.log(`Processing medication ID as string: ${medIdStr}`);
-        
-        // Validate that the ID can be converted to a BigInt
-        try {
-          BigInt(medIdStr);
-        } catch (err) {
-          console.error('Failed to convert medication ID to BigInt:', err, 'Original value:', medicationId);
-          Sentry.captureException(err);
-          return res.status(400).json({
-            error: 'Invalid medication ID format. Please select a valid medication.'
-          });
-        }
-        
-        // Use database query with properly typed BigInt
-        const medResult = await db.select()
-          .from(medications)
-          .where(and(
-            eq(medications.id, BigInt(medIdStr)),
-            eq(medications.userId, user.id)
-          ));
-        
-        console.log(`Found ${medResult.length} matching medications`);
-        
-        if (medResult.length === 0) {
-          return res.status(404).json({ error: 'Medication not found or does not belong to user' });
-        }
-        
-        // Use the verified medication ID as BigInt
-        const result = await db.insert(sideEffects)
-          .values({
-            userId: user.id,
-            medicationId: BigInt(medIdStr),
-            symptom,
-            severity,
-            timeOfDay,
-            date: new Date(date),
-            notes,
-          })
-          .returning();
-
-        console.log(`Created side effect with ID: ${result[0].id}`);
-        return res.status(201).json(result[0]);
-      } catch (error) {
-        console.error('Error processing medication ID:', error);
-        Sentry.captureException(error);
-        return res.status(500).json({ error: 'Failed to process medication ID. Please try again.' });
+      // Validate medicationId
+      const validation = validateMedicationId(medicationId);
+      if (!validation.isValid) {
+        console.error('Medication ID validation failed:', validation.error);
+        return res.status(400).json({ error: validation.error });
       }
+      
+      const medIdStr = validation.value;
+      console.log(`Processing medication ID as string: ${medIdStr}`);
+      
+      // Use database query with properly typed BigInt
+      const medResult = await db.select()
+        .from(medications)
+        .where(and(
+          eq(medications.id, BigInt(medIdStr)),
+          eq(medications.userId, user.id)
+        ));
+      
+      console.log(`Found ${medResult.length} matching medications`);
+      
+      if (medResult.length === 0) {
+        return res.status(404).json({ error: 'Medication not found or does not belong to user' });
+      }
+      
+      // Use the verified medication ID as BigInt
+      const result = await db.insert(sideEffects)
+        .values({
+          userId: user.id,
+          medicationId: BigInt(medIdStr),
+          symptom,
+          severity,
+          timeOfDay,
+          date: new Date(date),
+          notes,
+        })
+        .returning();
+
+      console.log(`Created side effect with ID: ${result[0].id}`);
+      return res.status(201).json(result[0]);
     }
 
     // PUT request - update a side effect
@@ -144,76 +160,54 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      try {
-        // Enhanced check for Date objects
-        if (medicationId instanceof Date || 
-            (typeof medicationId === 'object' && medicationId !== null && 
-             'toISOString' in medicationId)) {
-          console.error('Invalid medication ID: Received a Date object instead of a string or number');
-          Sentry.captureException(new Error(`Date object received as medicationId in PUT: ${medicationId}`));
-          return res.status(400).json({ 
-            error: 'Invalid medication ID format. Please select a valid medication.' 
-          });
-        }
-        
-        // Convert medicationId to string to avoid number precision issues
-        const medIdStr = String(medicationId);
-        
-        // Validate that the ID can be converted to a BigInt
-        try {
-          BigInt(medIdStr);
-        } catch (err) {
-          console.error('Failed to convert medication ID to BigInt:', err);
-          Sentry.captureException(err);
-          return res.status(400).json({
-            error: 'Invalid medication ID format. Please select a valid medication.'
-          });
-        }
-        
-        // Verify medication belongs to user using properly typed BigInt
-        const medResult = await db.select()
-          .from(medications)
-          .where(and(
-            eq(medications.id, BigInt(medIdStr)),
-            eq(medications.userId, user.id)
-          ));
-        
-        if (medResult.length === 0) {
-          return res.status(404).json({ error: 'Medication not found or does not belong to user' });
-        }
-        
-        // Verify side effect belongs to user
-        const existingSideEffect = await db.select()
-          .from(sideEffects)
-          .where(and(
-            eq(sideEffects.id, id),
-            eq(sideEffects.userId, user.id)
-          ));
-        
-        if (existingSideEffect.length === 0) {
-          return res.status(404).json({ error: 'Side effect not found or does not belong to user' });
-        }
-        
-        const result = await db.update(sideEffects)
-          .set({
-            medicationId: BigInt(medIdStr),
-            symptom,
-            severity,
-            timeOfDay,
-            date: new Date(date),
-            notes,
-            updatedAt: new Date(),
-          })
-          .where(eq(sideEffects.id, id))
-          .returning();
-
-        console.log(`Updated side effect with ID: ${result[0].id}`);
-        return res.status(200).json(result[0]);
-      } catch (error) {
-        console.error('Error updating side effect:', error);
-        Sentry.captureException(error);
-        return res.status(500).json({ error: 'Failed to update side effect. Please try again.' });
+      // Validate medicationId
+      const validation = validateMedicationId(medicationId);
+      if (!validation.isValid) {
+        console.error('Medication ID validation failed:', validation.error);
+        return res.status(400).json({ error: validation.error });
       }
+      
+      const medIdStr = validation.value;
+      
+      // Verify medication belongs to user using properly typed BigInt
+      const medResult = await db.select()
+        .from(medications)
+        .where(and(
+          eq(medications.id, BigInt(medIdStr)),
+          eq(medications.userId, user.id)
+        ));
+      
+      if (medResult.length === 0) {
+        return res.status(404).json({ error: 'Medication not found or does not belong to user' });
+      }
+      
+      // Verify side effect belongs to user
+      const existingSideEffect = await db.select()
+        .from(sideEffects)
+        .where(and(
+          eq(sideEffects.id, id),
+          eq(sideEffects.userId, user.id)
+        ));
+      
+      if (existingSideEffect.length === 0) {
+        return res.status(404).json({ error: 'Side effect not found or does not belong to user' });
+      }
+      
+      const result = await db.update(sideEffects)
+        .set({
+          medicationId: BigInt(medIdStr),
+          symptom,
+          severity,
+          timeOfDay,
+          date: new Date(date),
+          notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(sideEffects.id, id))
+        .returning();
+
+      console.log(`Updated side effect with ID: ${result[0].id}`);
+      return res.status(200).json(result[0]);
     }
 
     // DELETE request - delete a side effect

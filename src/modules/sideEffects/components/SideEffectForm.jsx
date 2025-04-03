@@ -11,10 +11,45 @@ const TIME_OF_DAY_OPTIONS = [
 
 const SEVERITY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+// Helper function to validate medication ID
+const isValidMedicationId = (id) => {
+  // Check if it's a Date object or has Date methods
+  if (id instanceof Date || 
+      (typeof id === 'object' && id !== null && 'toISOString' in id)) {
+    console.error('Invalid medication ID: Date object detected:', id);
+    return false;
+  }
+
+  // Check if it's a string or number that can be parsed
+  if (typeof id !== 'string' && typeof id !== 'number') {
+    console.error('Invalid medication ID type:', typeof id);
+    return false;
+  }
+
+  // Ensure it can be parsed as a number
+  try {
+    if (isNaN(Number(id))) {
+      console.error('Medication ID is not a valid number:', id);
+      return false;
+    }
+  } catch (err) {
+    console.error('Error parsing medication ID:', err);
+    return false;
+  }
+
+  return true;
+};
+
 export default function SideEffectForm({ sideEffect, medications, onSubmit, onCancel }) {
+  // Ensure medication ID is valid before using it
+  let initialMedicationId = '';
+  if (sideEffect?.medicationId && isValidMedicationId(sideEffect.medicationId)) {
+    initialMedicationId = sideEffect.medicationId;
+  }
+
   const [formData, setFormData] = useState({
     id: sideEffect?.id || null,
-    medicationId: sideEffect?.medicationId || '',
+    medicationId: initialMedicationId,
     symptom: sideEffect?.symptom || '',
     severity: sideEffect?.severity || 5,
     timeOfDay: sideEffect?.timeOfDay || TIME_OF_DAY_OPTIONS[0],
@@ -28,28 +63,36 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
   // Update selected medication if medications load after component mounts
   useEffect(() => {
     if ((!formData.medicationId || formData.medicationId === '') && medications.length > 0) {
-      // Validate that the medication ID is not a Date object
-      const medId = medications[0].id;
+      // Find first valid medication ID in the array
+      const validMedication = medications.find(med => isValidMedicationId(med.id));
       
-      if (medId instanceof Date || 
-          (typeof medId === 'object' && medId !== null && 'toISOString' in medId)) {
-        console.error('Invalid medication ID detected in medications array:', medId);
-        Sentry.captureException(new Error('Received Date object as medication ID'));
-        return;
+      if (validMedication) {
+        console.log('Setting initial medication ID:', validMedication.id, 'Type:', typeof validMedication.id);
+        
+        setFormData(prev => ({
+          ...prev,
+          medicationId: validMedication.id
+        }));
+      } else {
+        console.error('No valid medication IDs found in medications array');
+        Sentry.captureException(new Error('No valid medication IDs found'));
       }
-      
-      console.log('Setting initial medication ID:', medId, 'Type:', typeof medId);
-      
-      setFormData(prev => ({
-        ...prev,
-        medicationId: medId
-      }));
     }
   }, [medications, formData.medicationId]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
     console.log(`Field ${name} changed to: ${value} (${typeof value})`);
+    
+    // Special validation for medicationId
+    if (name === 'medicationId') {
+      if (!isValidMedicationId(value)) {
+        Sentry.captureException(new Error(`Invalid medication ID in form change: ${value}`));
+        setError('Invalid medication ID format. Please select a valid medication.');
+        return;
+      }
+    }
+    
     setFormData({ ...formData, [name]: value });
   };
   
@@ -70,49 +113,23 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
         return;
       }
       
-      // Make the API call to create/update the side effect
-      // Ensure medicationId is a valid string representation of a number
-      let medicationIdStr;
-      
-      // First explicitly check for Date objects
-      if (formData.medicationId instanceof Date || 
-          (typeof formData.medicationId === 'object' && formData.medicationId !== null && 
-           'toISOString' in formData.medicationId)) {
-        console.error('Date object detected as medication ID:', formData.medicationId);
+      // Validate medicationId one last time before submission
+      if (!isValidMedicationId(formData.medicationId)) {
         setError('Invalid medication ID format. Please select a valid medication.');
-        Sentry.captureException(new Error('Attempted to submit with Date as medication ID'));
+        Sentry.captureException(new Error(`Invalid medication ID at submission: ${formData.medicationId}`));
         return;
       }
       
-      try {
-        // First check if it's already a string
-        if (typeof formData.medicationId === 'string') {
-          medicationIdStr = formData.medicationId;
-        } else if (typeof formData.medicationId === 'number') {
-          medicationIdStr = String(formData.medicationId);
-        } else {
-          throw new Error(`Invalid medication ID format: ${typeof formData.medicationId}`);
-        }
-        
-        // Verify it can be parsed as a number
-        if (isNaN(Number(medicationIdStr))) {
-          throw new Error('Medication ID is not a valid number');
-        }
-      } catch (err) {
-        console.error('Invalid medication ID:', formData.medicationId, err);
-        Sentry.captureException(err);
-        setError('Invalid medication ID format. Please select a valid medication.');
-        return;
-      }
-      
+      // Create a safe payload with properly formatted values
       const payload = {
         ...formData,
-        medicationId: medicationIdStr,
+        // Ensure medicationId is a string for consistency
+        medicationId: String(formData.medicationId),
+        // Ensure severity is a number
         severity: parseInt(formData.severity)
       };
       
-      console.log('Submitting side effect with medication ID (as string):', payload.medicationId);
-      console.log('Full payload:', payload);
+      console.log('Submitting side effect with medication ID:', payload.medicationId, 'Type:', typeof payload.medicationId);
       await onSubmit(payload);
     } catch (err) {
       console.error('Error saving side effect:', err);
@@ -142,11 +159,13 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
           required
         >
           <option value="" disabled>Select a medication</option>
-          {medications.map((medication) => (
-            <option key={medication.id} value={medication.id}>
-              {medication.name} ({medication.dosage})
-            </option>
-          ))}
+          {medications
+            .filter(med => isValidMedicationId(med.id)) // Only show medications with valid IDs
+            .map((medication) => (
+              <option key={medication.id} value={medication.id}>
+                {medication.name} ({medication.dosage})
+              </option>
+            ))}
         </select>
         {formData.medicationId === '' && (
           <p className="text-red-500 text-sm mt-1">Please select a medication</p>
