@@ -32,6 +32,7 @@ export default async function handler(req, res) {
         .orderBy(desc(sideEffects.date), desc(sideEffects.createdAt));
       
       if (medicationId) {
+        // Use BigInt to ensure proper comparison with the BIGINT column
         query = query.where(eq(sideEffects.medicationId, BigInt(medicationId)));
       }
       
@@ -57,43 +58,45 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      // Convert medicationId to string first to avoid any potential number format issues
-      const medIdStr = String(medicationId);
-      console.log(`Processing medication ID as string: ${medIdStr}`);
-      
-      // Use database's native equality comparison rather than JavaScript's
-      console.log(`Verifying medication ID ${medIdStr} belongs to user ${user.id}`);
-      
-      // Verify medication belongs to user using tagged template literals
-      // This avoids "NOT_TAGGED_CALL" error
-      const medResult = await client`
-        SELECT id FROM medications 
-        WHERE id = ${medIdStr} AND user_id = ${user.id}
-      `;
-      
-      console.log(`Found ${medResult.length} matching medications`);
-      
-      if (medResult.length === 0) {
-        return res.status(404).json({ error: 'Medication not found or does not belong to user' });
-      }
-      
-      // Use the medication ID from the database to ensure accuracy
-      const verifiedMedId = medResult[0].id;
-      
-      const result = await db.insert(sideEffects)
-        .values({
-          userId: user.id,
-          medicationId: verifiedMedId,
-          symptom,
-          severity,
-          timeOfDay,
-          date: new Date(date),
-          notes,
-        })
-        .returning();
+      try {
+        // Convert medicationId to string first to avoid any potential number format issues
+        const medIdStr = String(medicationId);
+        console.log(`Processing medication ID as string: ${medIdStr}`);
+        
+        // Use database query with properly typed BigInt
+        const medResult = await db.select()
+          .from(medications)
+          .where(and(
+            eq(medications.id, BigInt(medIdStr)),
+            eq(medications.userId, user.id)
+          ));
+        
+        console.log(`Found ${medResult.length} matching medications`);
+        
+        if (medResult.length === 0) {
+          return res.status(404).json({ error: 'Medication not found or does not belong to user' });
+        }
+        
+        // Use the verified medication ID as BigInt
+        const result = await db.insert(sideEffects)
+          .values({
+            userId: user.id,
+            medicationId: BigInt(medIdStr),
+            symptom,
+            severity,
+            timeOfDay,
+            date: new Date(date),
+            notes,
+          })
+          .returning();
 
-      console.log(`Created side effect with ID: ${result[0].id}`);
-      return res.status(201).json(result[0]);
+        console.log(`Created side effect with ID: ${result[0].id}`);
+        return res.status(201).json(result[0]);
+      } catch (error) {
+        console.error('Error processing medication ID:', error);
+        Sentry.captureException(error);
+        return res.status(500).json({ error: 'Failed to process medication ID. Please try again.' });
+      }
     }
 
     // PUT request - update a side effect
@@ -105,50 +108,54 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      // Convert medicationId to string to avoid number precision issues
-      const medIdStr = String(medicationId);
-      
-      // Verify medication belongs to user using tagged template literals
-      // This avoids "NOT_TAGGED_CALL" error
-      const medResult = await client`
-        SELECT id FROM medications 
-        WHERE id = ${medIdStr} AND user_id = ${user.id}
-      `;
-      
-      if (medResult.length === 0) {
-        return res.status(404).json({ error: 'Medication not found or does not belong to user' });
-      }
-      
-      // Use the medication ID from the database to ensure accuracy
-      const verifiedMedId = medResult[0].id;
-      
-      // Verify side effect belongs to user
-      const existingSideEffect = await db.select()
-        .from(sideEffects)
-        .where(and(
-          eq(sideEffects.id, id),
-          eq(sideEffects.userId, user.id)
-        ));
-      
-      if (existingSideEffect.length === 0) {
-        return res.status(404).json({ error: 'Side effect not found or does not belong to user' });
-      }
-      
-      const result = await db.update(sideEffects)
-        .set({
-          medicationId: verifiedMedId,
-          symptom,
-          severity,
-          timeOfDay,
-          date: new Date(date),
-          notes,
-          updatedAt: new Date(),
-        })
-        .where(eq(sideEffects.id, id))
-        .returning();
+      try {
+        // Convert medicationId to string to avoid number precision issues
+        const medIdStr = String(medicationId);
+        
+        // Verify medication belongs to user using properly typed BigInt
+        const medResult = await db.select()
+          .from(medications)
+          .where(and(
+            eq(medications.id, BigInt(medIdStr)),
+            eq(medications.userId, user.id)
+          ));
+        
+        if (medResult.length === 0) {
+          return res.status(404).json({ error: 'Medication not found or does not belong to user' });
+        }
+        
+        // Verify side effect belongs to user
+        const existingSideEffect = await db.select()
+          .from(sideEffects)
+          .where(and(
+            eq(sideEffects.id, id),
+            eq(sideEffects.userId, user.id)
+          ));
+        
+        if (existingSideEffect.length === 0) {
+          return res.status(404).json({ error: 'Side effect not found or does not belong to user' });
+        }
+        
+        const result = await db.update(sideEffects)
+          .set({
+            medicationId: BigInt(medIdStr),
+            symptom,
+            severity,
+            timeOfDay,
+            date: new Date(date),
+            notes,
+            updatedAt: new Date(),
+          })
+          .where(eq(sideEffects.id, id))
+          .returning();
 
-      console.log(`Updated side effect with ID: ${result[0].id}`);
-      return res.status(200).json(result[0]);
+        console.log(`Updated side effect with ID: ${result[0].id}`);
+        return res.status(200).json(result[0]);
+      } catch (error) {
+        console.error('Error updating side effect:', error);
+        Sentry.captureException(error);
+        return res.status(500).json({ error: 'Failed to update side effect. Please try again.' });
+      }
     }
 
     // DELETE request - delete a side effect

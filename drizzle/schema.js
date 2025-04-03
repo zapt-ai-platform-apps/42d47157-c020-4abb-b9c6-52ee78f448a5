@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, varchar, date } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, integer, varchar, date, bigint } from 'drizzle-orm/pg-core';
 
 // Medications table
 export const medications = pgTable('medications', {
@@ -18,7 +18,7 @@ export const medications = pgTable('medications', {
 export const sideEffects = pgTable('side_effects', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  medicationId: integer('medication_id').notNull(),
+  medicationId: bigint('medication_id').notNull(), // Changed from integer to bigint
   symptom: text('symptom').notNull(),
   severity: integer('severity').notNull(), // 1-10 scale
   timeOfDay: text('time_of_day').notNull(), // morning, afternoon, evening, night

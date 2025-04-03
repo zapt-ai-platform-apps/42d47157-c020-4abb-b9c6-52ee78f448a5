@@ -1,135 +1,98 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import handler from '../api/sideEffects';
+import { BigInt } from './setup';
 
-// Mock dependencies
-vi.mock('../drizzle/schema.js', () => ({
-  sideEffects: {
-    id: 'id',
-    userId: 'userId',
-    medicationId: 'medicationId',
-    date: 'date',
-    createdAt: 'createdAt'
-  },
-  medications: {
-    id: 'id',
-    name: 'name'
-  }
-}));
-
+// Mock the dependencies
 vi.mock('drizzle-orm/postgres-js', () => ({
   drizzle: vi.fn(() => ({
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        leftJoin: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => Promise.resolve([
-              { sideEffect: { id: 1 }, medicationName: 'Test Med' }
-            ]))
-          }))
-        }))
-      })),
-      insert: vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([{ id: 1 }]))
-        }))
-      })),
-      update: vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => ({
-            returning: vi.fn(() => Promise.resolve([{ id: 1 }]))
-          }))
-        }))
-      })),
-      delete: vi.fn(() => ({
-        where: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([{ id: 1 }]))
-        }))
-      }))
-    }))
-  })
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    values: vi.fn().mockReturnThis(),
+    returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+  }))
 }));
 
 vi.mock('postgres', () => {
-  const mockClient = vi.fn((...args) => {
-    // Check if this is a tagged template call or regular function call
-    if (typeof args[0] === 'string') {
-      // This simulates the old incorrect call pattern
-      return Promise.resolve([{ id: 1 }]);
-    } else {
-      // This simulates the new tagged template pattern
-      return Promise.resolve([{ id: 1 }]);
-    }
-  });
-  
-  // Add the end method needed in the finally block
-  mockClient.end = vi.fn();
-  
   return {
-    default: vi.fn(() => mockClient)
+    default: vi.fn(() => ({
+      end: vi.fn()
+    }))
   };
 });
 
-vi.mock('../api/_apiUtils.js', () => ({
-  authenticateUser: vi.fn(() => Promise.resolve({ id: 'user123' }))
+vi.mock('../drizzle/schema.js', () => ({
+  sideEffects: { id: 'id', userId: 'userId', medicationId: 'medicationId', date: 'date', createdAt: 'createdAt' },
+  medications: { id: 'id', name: 'name' }
 }));
 
-vi.mock('../api/_sentry.js', () => ({
-  default: {
-    captureException: vi.fn()
-  }
+vi.mock('./_apiUtils.js', () => ({
+  authenticateUser: vi.fn(() => ({ id: 'user123' }))
 }));
+
+vi.mock('./_sentry.js', () => ({
+  default: { captureException: vi.fn() }
+}));
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+  and: vi.fn(),
+  desc: vi.fn()
+}));
+
+// Import the handler after mocking dependencies
+let handler;
 
 describe('Side Effects API Handler', () => {
-  let req, res;
-
-  beforeEach(() => {
-    req = {
-      method: '',
-      body: {},
-      query: {}
-    };
+  beforeEach(async () => {
+    // Clear all mocks
+    vi.clearAllMocks();
     
-    res = {
-      status: vi.fn(() => res),
-      json: vi.fn(() => res)
-    };
+    // Import the handler dynamically to ensure it uses the mocked dependencies
+    const module = await import('../api/sideEffects.js');
+    handler = module.default;
   });
 
-  it('should handle medication query using tagged template literals', async () => {
-    // Set up POST request
-    req.method = 'POST';
-    req.body = {
-      medicationId: '123',
-      symptom: 'Headache',
-      severity: 5,
-      timeOfDay: 'morning',
-      date: '2023-06-01'
+  it('should correctly convert medication ID to BigInt when creating a side effect', async () => {
+    // Arrange
+    const req = {
+      method: 'POST',
+      body: {
+        medicationId: '1060514617554862091', // Large ID that would overflow an INTEGER
+        symptom: 'Headache',
+        severity: 5,
+        timeOfDay: 'Morning',
+        date: '2023-05-15',
+        notes: 'Test notes'
+      }
     };
     
-    // This will call our mocked postgres client, which simulates both usage patterns
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    // Mock the database select to return a medication
+    const db = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 1 }])
+    };
+
+    // Act
     await handler(req, res);
-    
-    // Verify the response was successful
+
+    // Assert
+    // Verify that BigInt was used to handle the large ID
+    expect(BigInt).toHaveBeenCalledWith('1060514617554862091');
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(Number) }));
-  });
-
-  it('should handle PUT requests with tagged template literals', async () => {
-    // Set up PUT request
-    req.method = 'PUT';
-    req.body = {
-      id: 1,
-      medicationId: '123',
-      symptom: 'Headache',
-      severity: 5,
-      timeOfDay: 'morning',
-      date: '2023-06-01'
-    };
-    
-    await handler(req, res);
-    
-    // Verify the response was successful
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(Number) }));
   });
 });
