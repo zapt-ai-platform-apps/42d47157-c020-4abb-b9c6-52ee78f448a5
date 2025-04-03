@@ -18,7 +18,7 @@ export const medications = pgTable('medications', {
 export const sideEffects = pgTable('side_effects', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),
-  medicationId: bigint('medication_id').notNull(), // Changed from integer to bigint
+  medicationId: bigint('medication_id', { mode: 'number' }).notNull(), // Added mode option
   symptom: text('symptom').notNull(),
   severity: integer('severity').notNull(), // 1-10 scale
   timeOfDay: text('time_of_day').notNull(), // morning, afternoon, evening, night
