@@ -9,6 +9,7 @@ export default function ReportsPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   
   useEffect(() => {
     fetchReports();
@@ -47,12 +48,19 @@ export default function ReportsPage() {
   };
   
   const handleDelete = async (id) => {
+    if (isDeleting) return; // Prevent multiple clicks
+    
     if (!window.confirm('Are you sure you want to delete this report?')) {
       return;
     }
     
     try {
+      setIsDeleting(true);
+      setError(''); // Clear any previous errors
+      
       const { data: { session } } = await supabase.auth.getSession();
+      
+      console.log(`Attempting to delete report with ID: ${id}`);
       
       const response = await fetch(`/api/reports?id=${id}`, {
         method: 'DELETE',
@@ -61,15 +69,21 @@ export default function ReportsPage() {
         }
       });
       
+      const responseData = await response.json().catch(() => ({}));
+      
       if (!response.ok) {
-        throw new Error('Failed to delete report');
+        console.error('Delete report response error:', response.status, responseData);
+        throw new Error(responseData.error || 'Failed to delete report');
       }
       
+      console.log('Report deleted successfully');
       setReports(reports.filter(report => report.id !== id));
     } catch (err) {
       console.error('Error deleting report:', err);
       Sentry.captureException(err);
-      setError('Failed to delete report. Please try again.');
+      setError(err.message || 'Failed to delete report. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
   
@@ -80,6 +94,7 @@ export default function ReportsPage() {
         <button
           onClick={() => navigate('/reports/create')}
           className="btn-primary cursor-pointer"
+          disabled={isDeleting}
         >
           Create New Report
         </button>
@@ -101,6 +116,7 @@ export default function ReportsPage() {
           reports={reports}
           onView={handleView}
           onDelete={handleDelete}
+          isDeleting={isDeleting}
         />
       )}
     </div>

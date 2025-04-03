@@ -122,25 +122,44 @@ export default async function handler(req, res) {
     // DELETE request - delete a report
     if (req.method === 'DELETE') {
       const { id } = req.query;
-      console.log(`Deleting report ID: ${id} for user: ${user.id}`);
+      console.log(`Deleting report ID: ${id} (type: ${typeof id}) for user: ${user.id}`);
       
       if (!id) {
         return res.status(400).json({ error: 'Missing report ID' });
       }
 
-      const result = await db.delete(reports)
-        .where(and(
-          eq(reports.id, parseInt(id)),
-          eq(reports.userId, user.id)
-        ))
-        .returning();
+      try {
+        // Parse the ID and handle potential NaN values
+        const reportId = parseInt(id);
+        console.log(`Parsed report ID: ${reportId}`);
+        
+        if (isNaN(reportId)) {
+          console.error(`Invalid report ID format: ${id}`);
+          return res.status(400).json({ error: 'Invalid report ID format' });
+        }
 
-      if (result.length === 0) {
-        return res.status(404).json({ error: 'Report not found or does not belong to user' });
+        // Attempt to delete the report
+        const result = await db.delete(reports)
+          .where(and(
+            eq(reports.id, reportId),
+            eq(reports.userId, user.id)
+          ))
+          .returning();
+
+        console.log(`Delete operation returned ${result.length} rows`);
+        
+        if (result.length === 0) {
+          console.log(`No report found with ID ${reportId} for user ${user.id}`);
+          return res.status(404).json({ error: 'Report not found or does not belong to user' });
+        }
+
+        console.log(`Successfully deleted report with ID: ${reportId}`);
+        return res.status(200).json({ success: true });
+      } catch (error) {
+        console.error(`Error deleting report with ID ${id}:`, error);
+        Sentry.captureException(error);
+        return res.status(500).json({ error: `Failed to delete report: ${error.message}` });
       }
-
-      console.log(`Deleted report with ID: ${id}`);
-      return res.status(200).json({ success: true });
     }
 
     // If we get here, the method is not supported
@@ -149,5 +168,12 @@ export default async function handler(req, res) {
     console.error('Error in reports API:', error);
     Sentry.captureException(error);
     return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    // Make sure to close the postgres client
+    try {
+      await client?.end();
+    } catch (err) {
+      console.error('Error closing database connection:', err);
+    }
   }
 }
