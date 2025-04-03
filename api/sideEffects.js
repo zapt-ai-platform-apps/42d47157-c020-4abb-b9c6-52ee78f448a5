@@ -64,15 +64,13 @@ export default async function handler(req, res) {
       // Use database's native equality comparison rather than JavaScript's
       console.log(`Verifying medication ID ${medIdStr} belongs to user ${user.id}`);
       
-      // Verify medication belongs to user using raw SQL for ID comparison
-      // This avoids JavaScript number precision issues
-      const medQuery = `
+      // Verify medication belongs to user using tagged template literals
+      // This avoids "NOT_TAGGED_CALL" error
+      const medResult = await client`
         SELECT id FROM medications 
-        WHERE id = $1 AND user_id = $2
+        WHERE id = ${medIdStr} AND user_id = ${user.id}
       `;
       
-      // Fix: Call client as a function instead of using .query method
-      const medResult = await client(medQuery, [medIdStr, user.id]);
       console.log(`Found ${medResult.length} matching medications`);
       
       if (medResult.length === 0) {
@@ -110,14 +108,12 @@ export default async function handler(req, res) {
       // Convert medicationId to string to avoid number precision issues
       const medIdStr = String(medicationId);
       
-      // Verify medication belongs to user using raw SQL
-      const medQuery = `
+      // Verify medication belongs to user using tagged template literals
+      // This avoids "NOT_TAGGED_CALL" error
+      const medResult = await client`
         SELECT id FROM medications 
-        WHERE id = $1 AND user_id = $2
+        WHERE id = ${medIdStr} AND user_id = ${user.id}
       `;
-      
-      // Fix: Call client as a function instead of using .query method
-      const medResult = await client(medQuery, [medIdStr, user.id]);
       
       if (medResult.length === 0) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });

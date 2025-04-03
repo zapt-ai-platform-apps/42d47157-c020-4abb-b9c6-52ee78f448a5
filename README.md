@@ -1,18 +1,58 @@
 # SideTrack
 
-A simple tool to track medication side effects and create doctor-ready reports.
+SideTrack is an application designed to help users track medication side effects and create doctor-ready reports.
 
-## Core Features:
-1. **Medication Log**: Add your medications with dosage and schedule
-2. **Side Effect Tracker**: Record symptoms with severity (1-10) and time of day
-3. **Daily Check-in**: Quick daily survey of how you're feeling
-4. **Doctor Report**: Generate a clean, printable summary for appointments
-5. **Timeline View**: See side effects mapped against medication changes
+## Features
 
-## How It Works:
-1. Enter your medications
-2. Log side effects when they occur
-3. Complete brief daily check-ins
-4. Generate report before doctor visits
+- Track medications with dosage, frequency, and scheduling information
+- Record side effects associated with specific medications
+- Log daily check-ins to monitor overall wellness
+- Generate comprehensive reports for medical appointments
+- Authentication for secure data management
 
-The app helps distinguish between normal adjustment periods and concerning side effects, with no sharing of data required. Works entirely on the user's device with a simple, accessible interface.
+## Development
+
+### Running Locally
+
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Set up required environment variables in a `.env` file
+4. Run the development server with `npm run dev`
+
+### Building for Production
+
+```
+npm run build
+```
+
+### Testing
+
+```
+npm test
+```
+
+## Recent Updates
+
+- Fixed database query issues in the side effects API using proper tagged template literals with the postgres client
+
+## Technical Details
+
+- Frontend: React with Tailwind CSS
+- Routing: React Router
+- Authentication: Supabase Auth
+- Database: CockroachDB with Drizzle ORM
+- API: Vercel Serverless Functions
+- Error Tracking: Sentry
+- Analytics: Umami
+
+## Environment Setup
+
+Configure the following environment variables:
+
+```
+VITE_PUBLIC_APP_ID=
+VITE_PUBLIC_APP_ENV=
+VITE_PUBLIC_SENTRY_DSN=
+VITE_PUBLIC_UMAMI_WEBSITE_ID=
+COCKROACH_DB_URL=
+```
