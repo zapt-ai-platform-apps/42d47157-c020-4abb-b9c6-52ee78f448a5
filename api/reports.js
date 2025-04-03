@@ -8,10 +8,13 @@ import { formatDateForDB } from './_dateUtils.js';
 
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/reports`);
+  
+  // Declare client outside try block so it's accessible in finally
+  let client = null;
 
   try {
     const user = await authenticateUser(req);
-    const client = postgres(process.env.COCKROACH_DB_URL);
+    client = postgres(process.env.COCKROACH_DB_URL);
     const db = drizzle(client);
 
     // GET request - retrieve all reports or a specific report data
