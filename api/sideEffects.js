@@ -8,10 +8,14 @@ import { eq, and, desc, sql } from 'drizzle-orm';
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/sideEffects`);
 
+  // Define client outside the try block so it's available in the finally block
+  let client = null;
+  let db = null;
+
   try {
     const user = await authenticateUser(req);
-    const client = postgres(process.env.COCKROACH_DB_URL);
-    const db = drizzle(client);
+    client = postgres(process.env.COCKROACH_DB_URL);
+    db = drizzle(client);
 
     // GET request - retrieve side effects
     if (req.method === 'GET') {
