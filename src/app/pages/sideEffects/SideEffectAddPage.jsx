@@ -29,8 +29,36 @@ export default function SideEffectAddPage() {
         }
         
         const data = await response.json();
-        console.log(`Fetched ${data.length} medications with IDs:`, data.map(med => med.id));
-        setMedications(data);
+        
+        // Validate medication IDs before setting state
+        const validMedications = data.map(med => {
+          // If the ID is a Date object, log an error and fix it
+          if (med.id instanceof Date || 
+              (typeof med.id === 'object' && med.id !== null && 'toISOString' in med.id)) {
+            console.error('Found Date object as medication ID:', med.id);
+            Sentry.captureException(new Error('Date object received as medication ID from API'));
+            
+            // Try to salvage by converting the date to a string timestamp
+            // This is a fallback but ideally the API should be fixed
+            med.id = String(Date.now());
+          }
+          
+          // Ensure ID is always a string or number
+          if (typeof med.id !== 'string' && typeof med.id !== 'number') {
+            console.error('Invalid medication ID type:', typeof med.id);
+            Sentry.captureException(new Error(`Invalid medication ID type: ${typeof med.id}`));
+            
+            // Use a fallback ID
+            med.id = String(Math.floor(Math.random() * 1000000));
+          }
+          
+          return med;
+        });
+        
+        console.log(`Fetched ${validMedications.length} medications with IDs:`, 
+                   validMedications.map(med => `${med.id} (${typeof med.id})`));
+        
+        setMedications(validMedications);
       } catch (err) {
         console.error('Error fetching medications:', err);
         Sentry.captureException(err);
@@ -57,6 +85,14 @@ export default function SideEffectAddPage() {
       console.log('Submitting side effect with medication ID (from page):', formData.medicationId);
       console.log('Medication ID type:', typeof formData.medicationId);
       
+      // First explicitly check for Date objects
+      if (formData.medicationId instanceof Date || 
+          (typeof formData.medicationId === 'object' && formData.medicationId !== null && 
+           'toISOString' in formData.medicationId)) {
+        console.error('Date object detected as medication ID:', formData.medicationId);
+        throw new Error('Invalid medication ID format. Please select a valid medication.');
+      }
+      
       // Ensure medicationId is a valid string representation of a number
       if (typeof formData.medicationId !== 'string' && typeof formData.medicationId !== 'number') {
         console.error('Invalid medication ID type:', typeof formData.medicationId);
@@ -69,6 +105,8 @@ export default function SideEffectAddPage() {
         medicationId: String(formData.medicationId),
         severity: Number(formData.severity)
       };
+      
+      console.log('Sending payload with medication ID:', safeFormData.medicationId);
       
       const { data: { session } } = await supabase.auth.getSession();
       

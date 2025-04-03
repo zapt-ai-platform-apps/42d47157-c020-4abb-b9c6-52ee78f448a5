@@ -124,4 +124,33 @@ describe('Side Effects API Handler', () => {
       error: expect.stringContaining('Invalid medication ID format') 
     }));
   });
+  
+  it('should handle when medication ID is an object but not a Date', async () => {
+    // Arrange
+    const req = {
+      method: 'POST',
+      body: {
+        medicationId: { someKey: 'someValue' }, // Object but not a Date
+        symptom: 'Headache',
+        severity: 5,
+        timeOfDay: 'Morning',
+        date: '2023-05-15',
+        notes: 'Test notes'
+      }
+    };
+    
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    // Act
+    await handler(req, res);
+
+    // Assert
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ 
+      error: expect.stringContaining('Invalid medication ID format') 
+    }));
+  });
 });

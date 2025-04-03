@@ -60,11 +60,24 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Check if medicationId is a date object or non-convertible type
+        // Enhanced check for Date objects with detailed logging
         if (medicationId instanceof Date || 
-            (typeof medicationId === 'object' && medicationId !== null && 
-             'toISOString' in medicationId)) {
-          console.error('Invalid medication ID: Received a Date object instead of a string or number');
+            (typeof medicationId === 'object' && medicationId !== null)) {
+          
+          // Check if it has toISOString method (characteristic of Date objects)
+          if ('toISOString' in medicationId) {
+            console.error('Invalid medication ID: Received a Date object:', medicationId);
+            Sentry.captureException(new Error(`Date object received as medicationId: ${medicationId}`));
+            return res.status(400).json({ 
+              error: 'Invalid medication ID format. Please select a valid medication.' 
+            });
+          }
+          
+          // Log details about this object for debugging
+          console.error('Invalid medication ID: Received an object instead of string/number:', 
+                       JSON.stringify(medicationId), 
+                       'Constructor:', medicationId.constructor ? medicationId.constructor.name : 'unknown');
+          
           return res.status(400).json({ 
             error: 'Invalid medication ID format. Please select a valid medication.' 
           });
@@ -78,7 +91,8 @@ export default async function handler(req, res) {
         try {
           BigInt(medIdStr);
         } catch (err) {
-          console.error('Failed to convert medication ID to BigInt:', err);
+          console.error('Failed to convert medication ID to BigInt:', err, 'Original value:', medicationId);
+          Sentry.captureException(err);
           return res.status(400).json({
             error: 'Invalid medication ID format. Please select a valid medication.'
           });
@@ -131,11 +145,12 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Check if medicationId is a date object or non-convertible type
+        // Enhanced check for Date objects
         if (medicationId instanceof Date || 
             (typeof medicationId === 'object' && medicationId !== null && 
              'toISOString' in medicationId)) {
           console.error('Invalid medication ID: Received a Date object instead of a string or number');
+          Sentry.captureException(new Error(`Date object received as medicationId in PUT: ${medicationId}`));
           return res.status(400).json({ 
             error: 'Invalid medication ID format. Please select a valid medication.' 
           });
@@ -149,6 +164,7 @@ export default async function handler(req, res) {
           BigInt(medIdStr);
         } catch (err) {
           console.error('Failed to convert medication ID to BigInt:', err);
+          Sentry.captureException(err);
           return res.status(400).json({
             error: 'Invalid medication ID format. Please select a valid medication.'
           });

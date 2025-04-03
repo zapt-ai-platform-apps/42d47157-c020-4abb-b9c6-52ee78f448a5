@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import * as Sentry from '@sentry/browser';
 
 const TIME_OF_DAY_OPTIONS = [
   "Morning",
@@ -27,15 +28,28 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
   // Update selected medication if medications load after component mounts
   useEffect(() => {
     if ((!formData.medicationId || formData.medicationId === '') && medications.length > 0) {
+      // Validate that the medication ID is not a Date object
+      const medId = medications[0].id;
+      
+      if (medId instanceof Date || 
+          (typeof medId === 'object' && medId !== null && 'toISOString' in medId)) {
+        console.error('Invalid medication ID detected in medications array:', medId);
+        Sentry.captureException(new Error('Received Date object as medication ID'));
+        return;
+      }
+      
+      console.log('Setting initial medication ID:', medId, 'Type:', typeof medId);
+      
       setFormData(prev => ({
         ...prev,
-        medicationId: medications[0].id
+        medicationId: medId
       }));
     }
   }, [medications, formData.medicationId]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
+    console.log(`Field ${name} changed to: ${value} (${typeof value})`);
     setFormData({ ...formData, [name]: value });
   };
   
@@ -59,6 +73,17 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
       // Make the API call to create/update the side effect
       // Ensure medicationId is a valid string representation of a number
       let medicationIdStr;
+      
+      // First explicitly check for Date objects
+      if (formData.medicationId instanceof Date || 
+          (typeof formData.medicationId === 'object' && formData.medicationId !== null && 
+           'toISOString' in formData.medicationId)) {
+        console.error('Date object detected as medication ID:', formData.medicationId);
+        setError('Invalid medication ID format. Please select a valid medication.');
+        Sentry.captureException(new Error('Attempted to submit with Date as medication ID'));
+        return;
+      }
+      
       try {
         // First check if it's already a string
         if (typeof formData.medicationId === 'string') {
@@ -66,7 +91,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
         } else if (typeof formData.medicationId === 'number') {
           medicationIdStr = String(formData.medicationId);
         } else {
-          throw new Error('Invalid medication ID format');
+          throw new Error(`Invalid medication ID format: ${typeof formData.medicationId}`);
         }
         
         // Verify it can be parsed as a number
@@ -75,6 +100,7 @@ export default function SideEffectForm({ sideEffect, medications, onSubmit, onCa
         }
       } catch (err) {
         console.error('Invalid medication ID:', formData.medicationId, err);
+        Sentry.captureException(err);
         setError('Invalid medication ID format. Please select a valid medication.');
         return;
       }
