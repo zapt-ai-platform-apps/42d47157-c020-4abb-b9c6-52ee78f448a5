@@ -40,8 +40,8 @@ export default async function handler(req, res) {
           name,
           dosage,
           frequency,
-          startDate: new Date(startDate),
-          endDate: endDate ? new Date(endDate) : null,
+          startDate: startDate, // Use the string directly instead of creating a Date object
+          endDate: endDate || null, // Use the string directly or null
           notes,
         })
         .returning();
@@ -59,15 +59,18 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Get current timestamp as ISO string for updatedAt
+      const now = new Date().toISOString();
+
       const result = await db.update(medications)
         .set({
           name,
           dosage,
           frequency,
-          startDate: new Date(startDate),
-          endDate: endDate ? new Date(endDate) : null,
+          startDate: startDate, // Use the string directly instead of creating a Date object
+          endDate: endDate || null, // Use the string directly or null
           notes,
-          updatedAt: new Date(),
+          updatedAt: now, // Use ISO string format
         })
         .where(eq(medications.id, id))
         .returning();
