@@ -3,7 +3,7 @@ import postgres from 'postgres';
 import { sideEffects, medications } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/sideEffects`);
@@ -71,10 +71,11 @@ export default async function handler(req, res) {
         WHERE id = $1 AND user_id = $2
       `;
       
-      const medResult = await client.query(medQuery, [medIdStr, user.id]);
-      console.log(`Found ${medResult.count} matching medications`);
+      // Fix: Call client as a function instead of using .query method
+      const medResult = await client(medQuery, [medIdStr, user.id]);
+      console.log(`Found ${medResult.length} matching medications`);
       
-      if (medResult.count === 0) {
+      if (medResult.length === 0) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });
       }
       
@@ -115,9 +116,10 @@ export default async function handler(req, res) {
         WHERE id = $1 AND user_id = $2
       `;
       
-      const medResult = await client.query(medQuery, [medIdStr, user.id]);
+      // Fix: Call client as a function instead of using .query method
+      const medResult = await client(medQuery, [medIdStr, user.id]);
       
-      if (medResult.count === 0) {
+      if (medResult.length === 0) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });
       }
       
