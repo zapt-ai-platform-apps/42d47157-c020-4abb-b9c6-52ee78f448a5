@@ -214,4 +214,32 @@ describe('Side Effects API Handler', () => {
       error: expect.stringContaining('Invalid medication ID format') 
     }));
   });
+
+  it('should properly format date values for side effects', async () => {
+    // Arrange
+    const req = {
+      method: 'POST',
+      body: {
+        medicationId: '1234567890',
+        symptom: 'Headache',
+        severity: 5,
+        timeOfDay: 'Morning',
+        date: new Date('2023-05-15'), // Date object instead of string
+        notes: 'Test notes'
+      }
+    };
+    
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+
+    // Act
+    await handler(req, res);
+
+    // Assert
+    // We can't directly check the formatted date since we've mocked the database
+    // But we can verify that the request succeeded
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
 });

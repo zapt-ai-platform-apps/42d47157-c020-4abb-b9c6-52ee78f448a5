@@ -5,6 +5,39 @@ import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq, and, desc } from 'drizzle-orm';
 
+/**
+ * Ensures a date value is properly formatted as a string
+ * Handles both Date objects and string inputs
+ * 
+ * @param {Date|string} date - The date to format
+ * @returns {string} The date formatted as a string in YYYY-MM-DD format
+ */
+function ensureDateString(date) {
+  if (date instanceof Date) {
+    // If it's a Date object, convert to ISO string and take just the YYYY-MM-DD part
+    return date.toISOString().split('T')[0];
+  } else if (typeof date === 'string') {
+    // If it's already a string, make sure it's in the right format
+    // Try to create a Date object and convert back to ensure consistent format
+    try {
+      const dateObj = new Date(date);
+      if (isNaN(dateObj.getTime())) {
+        // Invalid date string
+        throw new Error(`Invalid date string: ${date}`);
+      }
+      return dateObj.toISOString().split('T')[0];
+    } catch (error) {
+      console.error(`Error formatting date string: ${date}`, error);
+      // Return the original string if we can't parse it
+      // The database will reject it if it's in the wrong format
+      return date;
+    }
+  } else {
+    // If it's neither a Date nor a string, throw an error
+    throw new Error(`Date must be a Date object or string, received: ${typeof date}`);
+  }
+}
+
 // Helper to validate and sanitize medication IDs
 const validateMedicationId = (medicationId) => {
   console.log('Validating medication ID:', medicationId, 'Type:', typeof medicationId);
@@ -103,6 +136,7 @@ export default async function handler(req, res) {
       const { medicationId, symptom, severity, timeOfDay, date, notes } = req.body;
       console.log(`Creating new side effect: ${symptom} for user: ${user.id}, medication:`, medicationId);
       console.log('Medication ID type:', typeof medicationId, 'Value:', medicationId);
+      console.log('Date type:', typeof date, 'Value:', date);
       
       if (!medicationId || !symptom || !severity || !timeOfDay || !date) {
         console.error('Missing required fields:', { medicationId, symptom, severity, timeOfDay, date });
@@ -119,6 +153,16 @@ export default async function handler(req, res) {
       const medIdStr = validation.value;
       console.log(`Processing medication ID as string: ${medIdStr}`);
       
+      // Ensure date is properly formatted as string
+      let formattedDate;
+      try {
+        formattedDate = ensureDateString(date);
+        console.log(`Formatted date: ${formattedDate}`);
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        return res.status(400).json({ error: `Invalid date format: ${error.message}` });
+      }
+      
       // Use database query with properly typed BigInt
       const medResult = await db.select()
         .from(medications)
@@ -133,7 +177,7 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: 'Medication not found or does not belong to user' });
       }
       
-      // Use the verified medication ID as BigInt
+      // Use the verified medication ID as BigInt and formatted date string
       const result = await db.insert(sideEffects)
         .values({
           userId: user.id,
@@ -141,7 +185,7 @@ export default async function handler(req, res) {
           symptom,
           severity,
           timeOfDay,
-          date: new Date(date),
+          date: formattedDate, // Use the formatted date string
           notes,
         })
         .returning();
@@ -155,6 +199,7 @@ export default async function handler(req, res) {
       const { id, medicationId, symptom, severity, timeOfDay, date, notes } = req.body;
       console.log(`Updating side effect ID: ${id} for user: ${user.id}`);
       console.log('Medication ID type:', typeof medicationId, 'Value:', medicationId);
+      console.log('Date type:', typeof date, 'Value:', date);
       
       if (!id || !medicationId || !symptom || !severity || !timeOfDay || !date) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -168,6 +213,16 @@ export default async function handler(req, res) {
       }
       
       const medIdStr = validation.value;
+      
+      // Ensure date is properly formatted as string
+      let formattedDate;
+      try {
+        formattedDate = ensureDateString(date);
+        console.log(`Formatted date: ${formattedDate}`);
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        return res.status(400).json({ error: `Invalid date format: ${error.message}` });
+      }
       
       // Verify medication belongs to user using properly typed BigInt
       const medResult = await db.select()
@@ -199,9 +254,9 @@ export default async function handler(req, res) {
           symptom,
           severity,
           timeOfDay,
-          date: new Date(date),
+          date: formattedDate, // Use the formatted date string
           notes,
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(), // Format the updatedAt date as well
         })
         .where(eq(sideEffects.id, id))
         .returning();
