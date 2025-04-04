@@ -1,7 +1,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 
-export default function ReportList({ reports, onView, onDelete, isDeleting }) {
+export default function ReportList({ reports, onView, onDelete, deletingId }) {
   // Helper function to safely format dates
   const formatSafeDate = (dateString, formatStr = 'MMM d, yyyy') => {
     if (!dateString) return 'N/A';
@@ -71,16 +71,16 @@ export default function ReportList({ reports, onView, onDelete, isDeleting }) {
                 <button
                   onClick={() => onView(report.id)}
                   className="text-indigo-600 hover:text-indigo-900 mr-4 cursor-pointer"
-                  disabled={isDeleting}
+                  disabled={deletingId === report.id}
                 >
                   View
                 </button>
                 <button
                   onClick={() => onDelete(report.id)}
                   className="text-red-600 hover:text-red-900 cursor-pointer"
-                  disabled={isDeleting}
+                  disabled={deletingId !== null}
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
+                  {deletingId === report.id ? 'Deleting...' : 'Delete'}
                 </button>
               </td>
             </tr>

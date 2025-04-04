@@ -10,7 +10,7 @@ export default function ReportsPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reportToDelete, setReportToDelete] = useState(null);
   
@@ -51,7 +51,7 @@ export default function ReportsPage() {
   };
   
   const confirmDeleteReport = (id) => {
-    if (isDeleting) return; // Prevent actions while deletion is in progress
+    if (deletingId !== null) return; // Prevent actions while deletion is in progress
     
     // Find the report title for more context in the confirmation
     const report = reports.find(report => report.id === id);
@@ -60,10 +60,10 @@ export default function ReportsPage() {
   };
   
   const handleDelete = async () => {
-    if (isDeleting || !reportToDelete) return;
+    if (deletingId !== null || !reportToDelete) return;
     
     try {
-      setIsDeleting(true);
+      setDeletingId(reportToDelete.id);
       setError(''); // Clear any previous errors
       
       const { data: { session } } = await supabase.auth.getSession();
@@ -91,7 +91,7 @@ export default function ReportsPage() {
       Sentry.captureException(err);
       setError(err.message || 'Failed to delete report. Please try again.');
     } finally {
-      setIsDeleting(false);
+      setDeletingId(null);
       setReportToDelete(null);
     }
   };
@@ -103,7 +103,7 @@ export default function ReportsPage() {
         <button
           onClick={() => navigate('/reports/create')}
           className="btn-primary cursor-pointer"
-          disabled={isDeleting}
+          disabled={deletingId !== null}
         >
           Create New Report
         </button>
@@ -125,7 +125,7 @@ export default function ReportsPage() {
           reports={reports}
           onView={handleView}
           onDelete={confirmDeleteReport}
-          isDeleting={isDeleting}
+          deletingId={deletingId}
         />
       )}
       
