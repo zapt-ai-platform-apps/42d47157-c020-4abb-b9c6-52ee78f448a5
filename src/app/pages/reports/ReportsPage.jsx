@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportList } from '@/modules/reports';
+import ConfirmDialog from '@/modules/core/components/ConfirmDialog';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
 
@@ -10,6 +11,8 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState(null);
   
   useEffect(() => {
     fetchReports();
@@ -47,12 +50,17 @@ export default function ReportsPage() {
     navigate(`/reports/view/${id}`);
   };
   
-  const handleDelete = async (id) => {
-    if (isDeleting) return; // Prevent multiple clicks
+  const confirmDeleteReport = (id) => {
+    if (isDeleting) return; // Prevent actions while deletion is in progress
     
-    if (!window.confirm('Are you sure you want to delete this report?')) {
-      return;
-    }
+    // Find the report title for more context in the confirmation
+    const report = reports.find(report => report.id === id);
+    setReportToDelete(report);
+    setConfirmDelete(true);
+  };
+  
+  const handleDelete = async () => {
+    if (isDeleting || !reportToDelete) return;
     
     try {
       setIsDeleting(true);
@@ -60,9 +68,9 @@ export default function ReportsPage() {
       
       const { data: { session } } = await supabase.auth.getSession();
       
-      console.log(`Attempting to delete report with ID: ${id}`);
+      console.log(`Attempting to delete report with ID: ${reportToDelete.id}`);
       
-      const response = await fetch(`/api/reports?id=${id}`, {
+      const response = await fetch(`/api/reports?id=${reportToDelete.id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${session?.access_token}`
@@ -77,13 +85,14 @@ export default function ReportsPage() {
       }
       
       console.log('Report deleted successfully');
-      setReports(reports.filter(report => report.id !== id));
+      setReports(reports.filter(report => report.id !== reportToDelete.id));
     } catch (err) {
       console.error('Error deleting report:', err);
       Sentry.captureException(err);
       setError(err.message || 'Failed to delete report. Please try again.');
     } finally {
       setIsDeleting(false);
+      setReportToDelete(null);
     }
   };
   
@@ -115,10 +124,20 @@ export default function ReportsPage() {
         <ReportList 
           reports={reports}
           onView={handleView}
-          onDelete={handleDelete}
+          onDelete={confirmDeleteReport}
           isDeleting={isDeleting}
         />
       )}
+      
+      <ConfirmDialog
+        isOpen={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+        title="Delete Report"
+        message={`Are you sure you want to delete "${reportToDelete?.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmColor="red"
+      />
     </div>
   );
 }
