@@ -25,109 +25,13 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="order-1 md:order-2 flex justify-center">
-              <img src="https://images.unsplash.com/photo-1499933374294-4584851497cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHw5fHxzbWFydHBob25lJTIwYXBwJTIwZm9yJTIwbWVkaWNhdGlvbiUyMHRyYWNraW5nJTIwaW4lMjBhJTIwcGVyc29uJTI3cyUyMGhhbmQlMkMlMjBicmlnaHQlMjBhbmQlMjBjaGVlcmZ1bCUyMGhvbWUlMjBlbnZpcm9ubWVudCUyQyUyMG5vdCUyMG1lZGljYWwlMkMlMjBubyUyMGhvc3BpdGFsJTIwc2V0dGluZ3N8ZW58MHx8fHwxNzQzNzEwMzA1fDA&ixlib=rb-4.0.3&q=80&w=1080" 
+              <img src="https://images.unsplash.com/photo-1517467139951-f5a925c9f9de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwxMHx8Y2xlYW4lMjBhbmQlMjBtb2Rlcm4lMjBzbWFydHBob25lJTIwYXBwJTIwaW50ZXJmYWNlJTIwc2hvd2luZyUyMG1lZGljYXRpb24lMjB0cmFja2luZyUyMHNjcmVlbiUyMHdpdGglMjBjb2xvcmZ1bCUyMHBpbGwlMjBpY29ucyUyMGFuZCUyMGVhc3klMjBhZGQlMjBidXR0b24lMkMlMjBwZXJzb24lMjdzJTIwaGFuZCUyMGhvbGRpbmclMjBwaG9uZSUyQyUyMGJyaWdodCUyMGxpZ2h0aW5nJTJDJTIwbWluaW1hbGlzdCUyMGhvbWUlMjBzZXR0aW5nfGVufDB8fHx8MTc0Mzc2NDAyOXww&ixlib=rb-4.0.3&q=80&w=1080" src="https://images.unsplash.com/photo-1499933374294-4584851497cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHw5fHxzbWFydHBob25lJTIwYXBwJTIwZm9yJTIwbWVkaWNhdGlvbiUyMHRyYWNraW5nJTIwaW4lMjBhJTIwcGVyc29uJTI3cyUyMGhhbmQlMkMlMjBicmlnaHQlMjBhbmQlMjBjaGVlcmZ1bCUyMGhvbWUlMjBlbnZpcm9ubWVudCUyQyUyMG5vdCUyMG1lZGljYWwlMkMlMjBubyUyMGhvc3BpdGFsJTIwc2V0dGluZ3N8ZW58MHx8fHwxNzQzNzEwMzA1fDA&ixlib=rb-4.0.3&q=80&w=1080" 
                  
                 alt="SideTrack app interface on a smartphone with a person tracking their medication in a cozy home environment"
                 data-image-request="smartphone app for medication tracking in a person's hand, bright and cheerful home environment, not medical, no hospital settings"
                 className="rounded-2xl shadow-2xl max-w-full h-auto transform transition-all hover:scale-[1.02] duration-500 ease-in-out"
                 style={{maxHeight: "500px", objectFit: "cover"}}
               />
-            </div>
-          </div>
-        </div>
-        
-        {/* Wave separator */}
-        <div className="w-full">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 100" fill="white" className="w-full">
-            <path d="M0,64L80,58.7C160,53,320,43,480,48C640,53,800,75,960,75C1120,75,1280,53,1360,42.7L1440,32L1440,100L1360,100C1280,100,1120,100,960,100C800,100,640,100,480,100C320,100,160,100,80,100L0,100Z"></path>
-          </svg>
-        </div>
-      </header>
-
-      {/* Features Section */}
-      <section className="py-16 bg-white" id="features">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-indigo-100 text-indigo-800 mb-3">Features</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Simple Tools for Your Wellbeing
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Designed with you in mind - intuitive features that help you stay on top of your health journey.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-            <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100">
-              <div className="bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl w-14 h-14 flex items-center justify-center mb-5 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-7 h-7 text-white">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900">Medication Tracking</h3>
-              <p className="text-gray-600 leading-relaxed">Keep all your medications organized in one place with simple tracking tools.</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100">
-              <div className="bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl w-14 h-14 flex items-center justify-center mb-5 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-7 h-7 text-white">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900">Wellness Journal</h3>
-              <p className="text-gray-600 leading-relaxed">Record how you're feeling with a friendly interface that makes checking in easy.</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100">
-              <div className="bg-gradient-to-br from-green-400 to-teal-500 rounded-xl w-14 h-14 flex items-center justify-center mb-5 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-7 h-7 text-white">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900">Daily Check-ins</h3>
-              <p className="text-gray-600 leading-relaxed">Quick mood and energy level tracking helps spot patterns and improve your wellbeing.</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-shadow duration-300 border border-gray-100">
-              <div className="bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl w-14 h-14 flex items-center justify-center mb-5 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-7 h-7 text-white">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-3 text-gray-900">Smart Reports</h3>
-              <p className="text-gray-600 leading-relaxed">Create clear summaries to share with your healthcare team for more informed conversations.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-20 bg-gradient-to-b from-white to-gray-50" id="how-it-works">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-indigo-100 text-indigo-800 mb-3">How It Works</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Three Simple Steps
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              SideTrack is designed to be intuitive and easy to use, so you can focus on what matters most - your health.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
-            <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
-                <span className="text-2xl font-bold text-white">1</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-4 text-center text-gray-900">Sign Up & Add Medications</h3>
-              <p className="text-gray-600 text-center leading-relaxed">Create your free account and easily add your medications with a few simple taps.</p>
-              <div className="mt-6 text-center">
-                <img src="https://images.unsplash.com/photo-1485163819542-13adeb5e0068?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwxMHx8cGVyc29uJTIwYWRkaW5nJTIwbWVkaWNhdGlvbiUyMHRvJTIwYSUyMG1vYmlsZSUyMGFwcCUyQyUyMHNpbXBsZSUyMGFuZCUyMGNsZWFuJTIwaW50ZXJmYWNlJTJDJTIwYnJpZ2h0JTIwY29sb3JzfGVufDB8fHx8MTc0MzcxMDMwNXww&ixlib=rb-4.0.3&q=80&w=1080" 
-                   
-                  alt="Adding medication to SideTrack"
-                  data-image-request="person adding medication to a mobile app, simple and clean interface, bright colors"
-                  className="h-40 mx-auto rounded-lg shadow-md"
-                />
               </div>
             </div>
 
@@ -138,11 +42,11 @@ export default function LandingPage() {
               <h3 className="text-xl font-semibold mb-4 text-center text-gray-900">Track Your Well-being</h3>
               <p className="text-gray-600 text-center leading-relaxed">Log how you're feeling each day with quick check-ins that take just seconds.</p>
               <div className="mt-6 text-center">
-                <img src="https://images.unsplash.com/photo-1515511856280-7b23f68d2996?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwzfHxwZXJzb24lMjBsb2dnaW5nJTIwbW9vZCUyMGluJTIwYSUyMG1vYmlsZSUyMGFwcCUyQyUyMHNtaWxpbmclMkMlMjBsaXZpbmclMjByb29tJTIwc2V0dGluZ3xlbnwwfHx8fDE3NDM3MTAzMDZ8MA&ixlib=rb-4.0.3&q=80&w=1080" 
-                   
-                  alt="Tracking daily well-being in SideTrack"
-                  data-image-request="person logging mood in a mobile app, smiling, living room setting"
-                  className="h-40 mx-auto rounded-lg shadow-md"
+                <img src="https://images.unsplash.com/photo-1494597564530-871f2b93ac55?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwzfHxwZXJzb24lMjB3aXRoJTIwcmVsYXhlZCUyMGV4cHJlc3Npb24lMjB1c2luZyUyMGhlYWx0aCUyMHRyYWNraW5nJTIwYXBwJTIwdG8lMjBsb2clMjBtb29kJTIwYW5kJTIwc3ltcHRvbXMlMkMlMjBjbGVhbiUyMFVJJTIwd2l0aCUyMG1vb2QlMjBlbW9qaSUyMHNsaWRlciUyQyUyMGJyaWdodCUyMG5hdHVyYWwlMjBsaWdodGluZyUyMGluJTIwY296eSUyMGxpdmluZyUyMHJvb20lMkMlMjBzb2Z0JTIwY29sb3JzJTJDJTIwc21hcnRwaG9uZSUyMGluJTIwaGFuZHxlbnwwfHx8fDE3NDM3NjQwMzB8MA&ixlib=rb-4.0.3&q=80&w=1080" 
+                  alt="Recording daily wellbeing in the SideTrack app" 
+                  data-image-request="person with relaxed expression using health tracking app to log mood and symptoms, clean UI with mood emoji slider, bright natural lighting in cozy living room, soft colors, smartphone in hand"
+                  className="h-52 w-full object-cover object-center mx-auto rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+                  style={{maxWidth: "280px"}}
                 />
               </div>
             </div>
@@ -154,11 +58,11 @@ export default function LandingPage() {
               <h3 className="text-xl font-semibold mb-4 text-center text-gray-900">Share Insights</h3>
               <p className="text-gray-600 text-center leading-relaxed">Generate easy-to-read reports that help your healthcare provider understand your experience.</p>
               <div className="mt-6 text-center">
-                <img src="https://images.unsplash.com/photo-1431540015161-0bf868a2d407?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwyfHxwZXJzb24lMjBzaG93aW5nJTIwYSUyMGhlYWx0aCUyMHJlcG9ydCUyMHRvJTIwYSUyMGRvY3RvciUyMG9uJTIwYSUyMHRhYmxldCUyQyUyMGZyaWVuZGx5JTIwY29uc3VsdGF0aW9uJTJDJTIwYnJpZ2h0JTIwb2ZmaWNlfGVufDB8fHx8MTc0MzcxMDMwNnww&ixlib=rb-4.0.3&q=80&w=1080" 
-                   
-                  alt="Sharing a SideTrack report with doctor"
-                  data-image-request="person showing a health report to a doctor on a tablet, friendly consultation, bright office"
-                  className="h-40 mx-auto rounded-lg shadow-md"
+                <img src="https://images.unsplash.com/photo-1497366811353-6870744d04b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHw1fHxwZXJzb24lMjBzaG93aW5nJTIwY29sb3JmdWwlMjBoZWFsdGglMjByZXBvcnQlMjBvbiUyMHRhYmxldCUyMHRvJTIwYXR0ZW50aXZlJTIwZG9jdG9yJTJDJTIwY2xlYW4lMjBkYXRhJTIwdmlzdWFsaXphdGlvbiUyMHdpdGglMjBncmFwaHMlMjBzaG93aW5nJTIwbWVkaWNhdGlvbiUyMGVmZmVjdHMlMjBvdmVyJTIwdGltZSUyQyUyMGJyaWdodCUyMG1vZGVybiUyMG1lZGljYWwlMjBvZmZpY2UlMkMlMjBwcm9mZXNzaW9uYWwlMjBidXQlMjBmcmllbmRseSUyMGludGVyYWN0aW9ufGVufDB8fHx8MTc0Mzc2NDAzMHww&ixlib=rb-4.0.3&q=80&w=1080" 
+                  alt="Sharing SideTrack reports with healthcare provider" 
+                  data-image-request="person showing colorful health report on tablet to attentive doctor, clean data visualization with graphs showing medication effects over time, bright modern medical office, professional but friendly interaction"
+                  className="h-52 w-full object-cover object-center mx-auto rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+                  style={{maxWidth: "280px"}}
                 />
               </div>
             </div>
