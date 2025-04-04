@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, parseISO, isValid } from 'date-fns';
+import { format } from 'date-fns';
 
 export default function ReportList({ reports, onView, onDelete, isDeleting }) {
   // Helper function to safely format dates
@@ -7,17 +7,17 @@ export default function ReportList({ reports, onView, onDelete, isDeleting }) {
     if (!dateString) return 'N/A';
     
     try {
-      // For ISO strings, use parseISO
-      if (typeof dateString === 'string' && dateString.includes('T')) {
-        const date = parseISO(dateString);
-        if (isValid(date)) return format(date, formatStr);
+      // Create a new Date object from the ISO string
+      const date = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date: ${dateString}`);
+        return 'N/A';
       }
       
-      // Standard date parsing
-      const date = new Date(dateString);
-      if (isValid(date)) return format(date, formatStr);
-      
-      return 'N/A';
+      // Format the date
+      return format(date, formatStr);
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       return 'N/A';
