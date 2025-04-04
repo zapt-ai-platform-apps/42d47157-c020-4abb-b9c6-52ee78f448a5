@@ -1,7 +1,14 @@
 import React from 'react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 export default function ReportList({ reports, onView, onDelete, isDeleting }) {
+  // Helper function to safely format dates
+  const formatSafeDate = (dateString, formatStr = 'MMM d, yyyy') => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return isValid(date) ? format(date, formatStr) : 'N/A';
+  };
+
   if (!reports || reports.length === 0) {
     return (
       <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -37,12 +44,12 @@ export default function ReportList({ reports, onView, onDelete, isDeleting }) {
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-500">
-                  {format(new Date(report.startDate), 'MMM d, yyyy')} - {format(new Date(report.endDate), 'MMM d, yyyy')}
+                  {formatSafeDate(report.startDate)} - {formatSafeDate(report.endDate)}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-500">
-                  {format(new Date(report.createdAt), 'MMM d, yyyy')}
+                  {formatSafeDate(report.createdAt)}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
