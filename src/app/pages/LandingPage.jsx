@@ -25,13 +25,44 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="order-1 md:order-2 flex justify-center">
-              <img src="https://images.unsplash.com/photo-1517467139951-f5a925c9f9de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwxMHx8Y2xlYW4lMjBhbmQlMjBtb2Rlcm4lMjBzbWFydHBob25lJTIwYXBwJTIwaW50ZXJmYWNlJTIwc2hvd2luZyUyMG1lZGljYXRpb24lMjB0cmFja2luZyUyMHNjcmVlbiUyMHdpdGglMjBjb2xvcmZ1bCUyMHBpbGwlMjBpY29ucyUyMGFuZCUyMGVhc3klMjBhZGQlMjBidXR0b24lMkMlMjBwZXJzb24lMjdzJTIwaGFuZCUyMGhvbGRpbmclMjBwaG9uZSUyQyUyMGJyaWdodCUyMGxpZ2h0aW5nJTJDJTIwbWluaW1hbGlzdCUyMGhvbWUlMjBzZXR0aW5nfGVufDB8fHx8MTc0Mzc2NDAyOXww&ixlib=rb-4.0.3&q=80&w=1080" src="https://images.unsplash.com/photo-1499933374294-4584851497cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHw5fHxzbWFydHBob25lJTIwYXBwJTIwZm9yJTIwbWVkaWNhdGlvbiUyMHRyYWNraW5nJTIwaW4lMjBhJTIwcGVyc29uJTI3cyUyMGhhbmQlMkMlMjBicmlnaHQlMjBhbmQlMjBjaGVlcmZ1bCUyMGhvbWUlMjBlbnZpcm9ubWVudCUyQyUyMG5vdCUyMG1lZGljYWwlMkMlMjBubyUyMGhvc3BpdGFsJTIwc2V0dGluZ3N8ZW58MHx8fHwxNzQzNzEwMzA1fDA&ixlib=rb-4.0.3&q=80&w=1080" 
-                 
+              <img src="https://images.unsplash.com/photo-1499933374294-4584851497cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHw5fHxzbWFydHBob25lJTIwYXBwJTIwZm9yJTIwbWVkaWNhdGlvbiUyMHRyYWNraW5nJTIwaW4lMjBhJTIwcGVyc29uJTI3cyUyMGhhbmQlMkMlMjBicmlnaHQlMjBhbmQlMjBjaGVlcmZ1bCUyMGhvbWUlMjBlbnZpcm9ubWVudCUyQyUyMG5vdCUyMG1lZGljYWwlMkMlMjBubyUyMGhvc3BpdGFsJTIwc2V0dGluZ3N8ZW58MHx8fHwxNzQzNzEwMzA1fDA&ixlib=rb-4.0.3&q=80&w=1080" 
                 alt="SideTrack app interface on a smartphone with a person tracking their medication in a cozy home environment"
                 data-image-request="smartphone app for medication tracking in a person's hand, bright and cheerful home environment, not medical, no hospital settings"
                 className="rounded-2xl shadow-2xl max-w-full h-auto transform transition-all hover:scale-[1.02] duration-500 ease-in-out"
                 style={{maxHeight: "500px", objectFit: "cover"}}
               />
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-indigo-100 text-indigo-800 mb-3">How It Works</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Simple Steps to Better Health Tracking
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              SideTrack makes it easy to manage medications and monitor how you're feeling, all in one place.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
+                <span className="text-2xl font-bold text-white">1</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-4 text-center text-gray-900">Track Medications</h3>
+              <p className="text-gray-600 text-center leading-relaxed">Easily log your medications and note any side effects you experience.</p>
+              <div className="mt-6 text-center">
+                <img src="https://images.unsplash.com/photo-1471864190281-a93a3070b6de?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2NjQ4Nzh8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBob2xkaW5nJTIwcGlsbHMlMjBpbiUyMHRoZWlyJTIwaGFuZCUyMGluJTIwYSUyMG5hdHVyYWwlMjBzZXR0aW5nJTJDJTIwbW9ybmluZyUyMGxpZ2h0JTJDJTIwYnJpZ2h0JTIwYW5kJTIwZnJlc2glMmMlMjBmb2N1cyUyMG9uJTIwaGFuZHN8ZW58MHx8fHwxNzQzNzY0MDMwfDA&ixlib=rb-4.0.3&q=80&w=1080" 
+                  alt="Tracking medications in the SideTrack app" 
+                  data-image-request="person holding pills in their hand in a natural setting, morning light, bright and fresh, focus on hands"
+                  className="h-52 w-full object-cover object-center mx-auto rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+                  style={{maxWidth: "280px"}}
+                />
               </div>
             </div>
 
