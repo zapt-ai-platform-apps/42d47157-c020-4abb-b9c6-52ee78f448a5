@@ -141,4 +141,66 @@ describe('Reports API Handler', () => {
     // Response should be successful
     expect(mockRes.status).toHaveBeenCalledWith(200);
   });
+  
+  it('should handle Date objects correctly in convertBigIntToString function', async () => {
+    // Setup mocks
+    const mockUser = { id: 'test-user-id' };
+    const mockReq = {
+      method: 'GET',
+      query: {},
+    };
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    
+    // Create a sample date for testing
+    const testDate = new Date('2025-04-04T10:03:17.988Z');
+    
+    // Create test data with a Date object
+    const testData = [
+      {
+        id: '12345',
+        title: 'Test Report',
+        createdAt: testDate, // Date object
+        startDate: '2023-01-01',
+        endDate: '2023-01-31',
+      },
+    ];
+    
+    const mockDb = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+    };
+    
+    // Mock the drizzle function to return mockDb
+    const { drizzle } = await import('drizzle-orm/postgres-js');
+    drizzle.mockReturnValue(mockDb);
+    
+    // Mock authenticateUser to return mockUser
+    const { authenticateUser } = await import('./_apiUtils.js');
+    authenticateUser.mockResolvedValue(mockUser);
+    
+    // Mock the select to return our test data with Date
+    mockDb.select.mockImplementationOnce(() => mockDb);
+    mockDb.from.mockImplementationOnce(() => mockDb);
+    mockDb.where.mockImplementationOnce(() => mockDb);
+    mockDb.orderBy.mockImplementationOnce(() => testData);
+    
+    // Call the handler
+    await handler(mockReq, mockRes);
+    
+    // Get what was passed to res.json
+    const dataPassedToJson = mockRes.json.mock.calls[0][0];
+    
+    // Verify the date was preserved and not converted to an empty object
+    expect(dataPassedToJson[0].createdAt).toBeDefined();
+    expect(dataPassedToJson[0].createdAt instanceof Date || 
+           (typeof dataPassedToJson[0].createdAt === 'string' && !isNaN(new Date(dataPassedToJson[0].createdAt)))).toBe(true);
+    
+    // Response should be successful
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+  });
 });

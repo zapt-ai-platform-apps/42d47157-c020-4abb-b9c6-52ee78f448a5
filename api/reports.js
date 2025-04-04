@@ -20,6 +20,11 @@ function convertBigIntToString(data) {
     return data.toString();
   }
   
+  // Add a check for Date objects to prevent them from being converted to empty objects
+  if (data instanceof Date) {
+    return data;
+  }
+  
   if (Array.isArray(data)) {
     return data.map(item => convertBigIntToString(item));
   }
