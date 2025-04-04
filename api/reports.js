@@ -116,19 +116,40 @@ export default async function handler(req, res) {
 
         const report = reportDetails[0];
         const { startDate, endDate } = report;
+        
+        console.log(`Fetching medications for user ${user.id} for report period ${startDate} to ${endDate}`);
 
-        // Get medications active during the report period
-        const medicationsList = await db.select()
+        // First fetch ALL medications for this user to ensure we don't miss any
+        const allMedicationsList = await db.select()
           .from(medications)
-          .where(and(
-            eq(medications.userId, user.id),
-            or(
-              isNull(medications.endDate),
-              medications.endDate >= startDate
-            ),
-            medications.startDate <= endDate
-          ))
+          .where(eq(medications.userId, user.id))
           .orderBy(medications.startDate);
+        
+        console.log(`Found ${allMedicationsList.length} total medications for this user`);
+        
+        // Then filter them to find those active during the report period
+        const medicationsList = allMedicationsList.filter(med => {
+          const medicationStart = new Date(med.startDate);
+          const medicationEnd = med.endDate ? new Date(med.endDate) : null;
+          const reportStart = new Date(startDate);
+          const reportEnd = new Date(endDate);
+          
+          // Medication started before or during the report period
+          const startedBeforeOrDuringReport = medicationStart <= reportEnd;
+          
+          // Medication ended after the report started or is still active
+          const endedAfterReportStartedOrStillActive = !medicationEnd || medicationEnd >= reportStart;
+          
+          const isActive = startedBeforeOrDuringReport && endedAfterReportStartedOrStillActive;
+          
+          if (isActive) {
+            console.log(`Including medication: ${med.name} (${med.startDate} to ${med.endDate || 'ongoing'})`);
+          }
+          
+          return isActive;
+        });
+        
+        console.log(`After filtering, found ${medicationsList.length} medications active during report period`);
 
         // Get side effects during the report period
         const sideEffectsList = await db.select({
@@ -158,7 +179,7 @@ export default async function handler(req, res) {
           medicationName: row.medicationName
         }));
 
-        console.log(`Successfully assembled report data for ID: ${reportId}`);
+        console.log(`Successfully assembled report data. Medications: ${medicationsList.length}, Side Effects: ${formattedSideEffects.length}, Check-ins: ${checkinsList.length}`);
         
         // Convert any BigInt values to strings before returning the JSON response
         const responseData = {

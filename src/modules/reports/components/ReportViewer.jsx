@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { format, isValid } from 'date-fns';
 import { jsPDF } from 'jspdf';
 
@@ -9,6 +9,18 @@ function formatDate(dateString) {
 
 export default function ReportViewer({ reportData, onBack }) {
   const reportRef = useRef(null);
+  
+  // Log the received data for debugging
+  useEffect(() => {
+    if (reportData) {
+      console.log('Report viewer received data:', {
+        hasReport: !!reportData.report,
+        medicationsCount: reportData.medications?.length || 0,
+        sideEffectsCount: reportData.sideEffects?.length || 0,
+        checkinsCount: reportData.checkins?.length || 0
+      });
+    }
+  }, [reportData]);
   
   if (!reportData || !reportData.report) {
     return (
@@ -24,7 +36,7 @@ export default function ReportViewer({ reportData, onBack }) {
     );
   }
   
-  const { report, medications, sideEffects, checkins } = reportData;
+  const { report, medications = [], sideEffects = [], checkins = [] } = reportData;
   
   const downloadPDF = () => {
     const doc = new jsPDF();
@@ -42,51 +54,65 @@ export default function ReportViewer({ reportData, onBack }) {
     doc.text('Medications', 15, 45);
     
     let yPosition = 55;
-    medications.forEach((med, index) => {
+    
+    if (medications.length === 0) {
       doc.setFontSize(12);
-      doc.text(`${index + 1}. ${med.name} - ${med.dosage} (${med.frequency})`, 20, yPosition);
-      doc.setFontSize(10);
-      doc.text(`Started: ${formatDate(med.startDate)}${med.endDate ? ` • Ended: ${formatDate(med.endDate)}` : ''}`, 25, yPosition + 5);
-      
-      if (med.notes) {
-        doc.text(`Notes: ${med.notes}`, 25, yPosition + 10);
-        yPosition += 15;
-      } else {
-        yPosition += 10;
-      }
-      
-      // Add a new page if we're getting close to the bottom
-      if (yPosition > 270) {
-        doc.addPage();
-        yPosition = 20;
-      }
-    });
+      doc.text('No medications recorded during this period.', 20, yPosition);
+      yPosition += 10;
+    } else {
+      medications.forEach((med, index) => {
+        doc.setFontSize(12);
+        doc.text(`${index + 1}. ${med.name} - ${med.dosage} (${med.frequency})`, 20, yPosition);
+        doc.setFontSize(10);
+        doc.text(`Started: ${formatDate(med.startDate)}${med.endDate ? ` • Ended: ${formatDate(med.endDate)}` : ''}`, 25, yPosition + 5);
+        
+        if (med.notes) {
+          doc.text(`Notes: ${med.notes}`, 25, yPosition + 10);
+          yPosition += 15;
+        } else {
+          yPosition += 10;
+        }
+        
+        // Add a new page if we're getting close to the bottom
+        if (yPosition > 270) {
+          doc.addPage();
+          yPosition = 20;
+        }
+      });
+    }
     
     // Side Effects section
     doc.setFontSize(16);
     doc.text('Side Effects', 15, yPosition + 10);
     
     yPosition += 20;
-    sideEffects.forEach((effect, index) => {
-      // Add a new page if we're getting close to the bottom
-      if (yPosition > 250) {
-        doc.addPage();
-        yPosition = 20;
-      }
-      
+    
+    if (sideEffects.length === 0) {
       doc.setFontSize(12);
-      doc.text(`${index + 1}. ${effect.symptom} (Severity: ${effect.severity}/10)`, 20, yPosition);
-      doc.setFontSize(10);
-      doc.text(`Date: ${formatDate(effect.date)} • Time: ${effect.timeOfDay}`, 25, yPosition + 5);
-      doc.text(`Medication: ${effect.medicationName || 'Unknown'}`, 25, yPosition + 10);
-      
-      if (effect.notes) {
-        doc.text(`Notes: ${effect.notes}`, 25, yPosition + 15);
-        yPosition += 20;
-      } else {
-        yPosition += 15;
-      }
-    });
+      doc.text('No side effects recorded during this period.', 20, yPosition);
+      yPosition += 10;
+    } else {
+      sideEffects.forEach((effect, index) => {
+        // Add a new page if we're getting close to the bottom
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        doc.setFontSize(12);
+        doc.text(`${index + 1}. ${effect.symptom} (Severity: ${effect.severity}/10)`, 20, yPosition);
+        doc.setFontSize(10);
+        doc.text(`Date: ${formatDate(effect.date)} • Time: ${effect.timeOfDay}`, 25, yPosition + 5);
+        doc.text(`Medication: ${effect.medicationName || 'Unknown'}`, 25, yPosition + 10);
+        
+        if (effect.notes) {
+          doc.text(`Notes: ${effect.notes}`, 25, yPosition + 15);
+          yPosition += 20;
+        } else {
+          yPosition += 15;
+        }
+      });
+    }
     
     // Check-ins summary
     if (checkins.length > 0) {

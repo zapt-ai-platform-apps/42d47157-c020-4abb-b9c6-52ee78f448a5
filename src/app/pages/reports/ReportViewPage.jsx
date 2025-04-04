@@ -51,7 +51,12 @@ export default function ReportViewPage() {
         }
         
         const data = await response.json();
-        console.log('Successfully retrieved report data');
+        console.log('Report data received:', {
+          hasReport: !!data.report,
+          medicationsCount: Array.isArray(data.medications) ? data.medications.length : 'not an array',
+          sideEffectsCount: Array.isArray(data.sideEffects) ? data.sideEffects.length : 'not an array',
+          checkinsCount: Array.isArray(data.checkins) ? data.checkins.length : 'not an array'
+        });
         setReportData(data);
       } catch (err) {
         console.error('Error fetching report data:', err);
