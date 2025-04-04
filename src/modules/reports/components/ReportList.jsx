@@ -1,12 +1,27 @@
 import React from 'react';
-import { format, isValid } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 
 export default function ReportList({ reports, onView, onDelete, isDeleting }) {
   // Helper function to safely format dates
   const formatSafeDate = (dateString, formatStr = 'MMM d, yyyy') => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return isValid(date) ? format(date, formatStr) : 'N/A';
+    
+    try {
+      // For ISO strings, use parseISO
+      if (typeof dateString === 'string' && dateString.includes('T')) {
+        const date = parseISO(dateString);
+        if (isValid(date)) return format(date, formatStr);
+      }
+      
+      // Standard date parsing
+      const date = new Date(dateString);
+      if (isValid(date)) return format(date, formatStr);
+      
+      return 'N/A';
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'N/A';
+    }
   };
 
   if (!reports || reports.length === 0) {
