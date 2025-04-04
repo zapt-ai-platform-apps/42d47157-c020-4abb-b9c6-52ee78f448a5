@@ -3,7 +3,7 @@ import postgres from 'postgres';
 import { medications, sideEffects, dailyCheckins, reports } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
-import { eq, and, between, desc, or } from 'drizzle-orm';
+import { eq, and, between, desc, or, isNull } from 'drizzle-orm';
 import { formatDateForDB } from './_dateUtils.js';
 
 /**
@@ -123,7 +123,7 @@ export default async function handler(req, res) {
           .where(and(
             eq(medications.userId, user.id),
             or(
-              medications.endDate.isNull(),
+              isNull(medications.endDate),
               medications.endDate >= startDate
             ),
             medications.startDate <= endDate
