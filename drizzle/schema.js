@@ -43,7 +43,7 @@ export const dailyCheckins = pgTable('daily_checkins', {
 
 // Reports table - Using string mode for bigint to handle large IDs properly
 export const reports = pgTable('reports', {
-  id: bigint('id', { mode: 'string' }).primaryKey(), // Changed to string mode to avoid precision issues
+  id: bigint('id', { mode: 'string' }).primaryKey({ autoIncrement: true }), // Added autoIncrement: true
   userId: text('user_id').notNull(),
   title: text('title').notNull(),
   startDate: date('start_date').notNull(),

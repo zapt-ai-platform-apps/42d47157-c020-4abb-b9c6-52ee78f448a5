@@ -192,18 +192,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      const result = await db.insert(reports)
-        .values({
-          userId: user.id,
-          title,
-          startDate: formatDateForDB(startDate),
-          endDate: formatDateForDB(endDate),
-        })
-        .returning();
+      try {
+        const result = await db.insert(reports)
+          .values({
+            userId: user.id,
+            title,
+            startDate: formatDateForDB(startDate),
+            endDate: formatDateForDB(endDate),
+          })
+          .returning();
 
-      console.log(`Created report with ID: ${result[0].id} (type: ${typeof result[0].id})`);
-      // Convert any BigInt values to strings
-      return res.status(201).json(convertBigIntToString(result[0]));
+        console.log(`Created report with ID: ${result[0].id} (type: ${typeof result[0].id})`);
+        // Convert any BigInt values to strings
+        return res.status(201).json(convertBigIntToString(result[0]));
+      } catch (error) {
+        console.error('Error inserting report:', error);
+        Sentry.captureException(error);
+        return res.status(500).json({ error: `Failed to create report: ${error.message}` });
+      }
     }
 
     // DELETE request - delete a report

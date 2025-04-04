@@ -226,4 +226,39 @@ describe('Reports API Handler', () => {
     expect(typeof jsonArg[0].id).toBe('string');
     expect(jsonArg[0].id).toBe('1060536072299642900');
   });
+
+  it('should create a new report successfully', async () => {
+    // Setup for POST request
+    mockReq.method = 'POST';
+    mockReq.body = {
+      title: 'New Test Report',
+      startDate: '2023-05-01',
+      endDate: '2023-05-31'
+    };
+    
+    // Mock successful insertion
+    mockDB.insert.mockReturnValue(mockDB);
+    mockDB.values.mockReturnValue(mockDB);
+    mockDB.returning.mockReturnValue([{ 
+      id: '1234567890',
+      title: 'New Test Report',
+      startDate: '2023-05-01',
+      endDate: '2023-05-31',
+      userId: 'test-user-id'
+    }]);
+
+    // Execute
+    await handler(mockReq, mockRes);
+
+    // Assert
+    expect(mockDB.insert).toHaveBeenCalledWith(reports);
+    expect(mockDB.values).toHaveBeenCalledWith({
+      userId: 'test-user-id',
+      title: 'New Test Report',
+      startDate: '2023-05-01',
+      endDate: '2023-05-31'
+    });
+    expect(mockRes.status).toHaveBeenCalledWith(201);
+    expect(mockRes.json).toHaveBeenCalled();
+  });
 });
