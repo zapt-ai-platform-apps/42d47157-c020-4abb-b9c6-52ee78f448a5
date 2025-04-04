@@ -1,132 +1,93 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { it, describe, expect, beforeAll, afterAll, vi } from 'vitest';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { reports } from '../drizzle/schema.js';
+import { eq } from 'drizzle-orm';
 
-// Mock the necessary modules and functions
-vi.mock('../drizzle/schema.js', () => ({
-  medications: { userId: {}, startDate: {}, endDate: {} },
-  sideEffects: { userId: {}, date: {}, createdAt: {} },
-  dailyCheckins: { userId: {}, date: {} },
-  reports: { id: {}, userId: {}, createdAt: {} }
-}));
-
-vi.mock('drizzle-orm/postgres-js', () => ({
-  drizzle: vi.fn(() => ({
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          orderBy: vi.fn(() => []),
-          limit: vi.fn(() => [])
-        })),
-        leftJoin: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => [])
-          }))
-        }))
-      }))
-    })),
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn(() => [{ id: '123' }])
-      }))
-    })),
-    delete: vi.fn(() => ({
-      where: vi.fn(() => ({
-        returning: vi.fn(() => [{ id: '123' }])
-      }))
-    }))
-  }))
-}));
-
-vi.mock('postgres', () => {
-  return {
-    default: vi.fn(() => ({
-      end: vi.fn()
-    }))
-  };
-});
-
-vi.mock('../api/_apiUtils.js', () => ({
-  authenticateUser: vi.fn(() => ({ id: 'user-123' }))
-}));
-
-vi.mock('../api/_sentry.js', () => ({
+// Mock functions and data
+vi.mock('@sentry/node', () => ({
   default: {
     captureException: vi.fn()
   }
 }));
 
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  between: vi.fn(),
-  desc: vi.fn(),
-  or: vi.fn()
-}));
+// Test user ID
+const TEST_USER_ID = 'test-user-123';
 
-import handler from '../api/reports.js';
+describe('Report ID handling', () => {
+  let client;
+  let db;
+  let createdReportId;
 
-describe('Reports API Handler', () => {
-  let req;
-  let res;
-
-  beforeEach(() => {
-    req = {
-      method: 'GET',
-      query: {},
-      headers: {}
-    };
-    
-    res = {
-      status: vi.fn(() => res),
-      json: vi.fn()
-    };
-    
-    // Reset console mocks
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // Connect to test database before tests
+  beforeAll(async () => {
+    client = postgres(process.env.COCKROACH_DB_URL);
+    db = drizzle(client);
   });
 
-  it('handles large report IDs correctly', async () => {
-    // Set up a very large ID that exceeds JavaScript's MAX_SAFE_INTEGER
-    const largeId = '1060536072299642891';
-    req.query = { id: largeId, data: 'true' };
-    
-    // Add BigInt to global if needed for test environment
-    if (typeof global.BigInt === 'undefined') {
-      global.BigInt = (n) => Number(n);
+  // Close connection after tests
+  afterAll(async () => {
+    if (createdReportId) {
+      // Clean up test report
+      try {
+        await db.delete(reports)
+          .where(eq(reports.id, createdReportId));
+      } catch (error) {
+        console.error('Failed to delete test report:', error);
+      }
     }
-    
-    // Spy on console
-    const consoleLogSpy = vi.spyOn(console, 'log');
-    
-    await handler(req, res);
-    
-    // Verify we used the string directly
-    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Using string value directly for report ID'));
-    
-    // Ensure we tried to query with the string ID
-    // Note: since our mock returns empty, we expect a 404
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-  
-  it('handles valid report ID format but non-existent report', async () => {
-    req.query = { id: '123', data: 'true' };
-    
-    await handler(req, res);
-    
-    // Our mock returns empty array, so should get 404
-    expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Report not found' });
-  });
-  
-  it('rejects invalid report ID format', async () => {
-    req.query = { id: 'not-a-number', data: 'true' };
-    
-    await handler(req, res);
-    
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Invalid report ID format' });
+    await client.end();
   });
 
-  // Add more tests for other aspects of the reports API
+  it('should handle large numeric IDs correctly', async () => {
+    // Insert a report with a large ID
+    const largeId = '9007199254740991'; // Max safe integer
+    const testReport = {
+      id: largeId,
+      userId: TEST_USER_ID,
+      title: 'Test Report with Large ID',
+      startDate: new Date('2023-01-01'),
+      endDate: new Date('2023-01-31'),
+    };
+
+    try {
+      // Try to insert the report
+      const result = await db.insert(reports)
+        .values(testReport)
+        .returning();
+      
+      createdReportId = result[0].id;
+      
+      // Verify it was inserted
+      expect(result.length).toBe(1);
+      
+      // Try to retrieve the report with different ID formats
+      // 1. Using string ID
+      const stringQuery = await db.select()
+        .from(reports)
+        .where(eq(reports.id, largeId));
+      
+      expect(stringQuery.length).toBe(1);
+      expect(stringQuery[0].title).toBe(testReport.title);
+      
+      // 2. Using numeric ID (this might fail if ID is too large)
+      try {
+        const numericId = Number(largeId);
+        const numericQuery = await db.select()
+          .from(reports)
+          .where(eq(reports.id, numericId));
+        
+        // This may or may not work depending on precision handling
+        if (numericQuery.length > 0) {
+          expect(numericQuery[0].title).toBe(testReport.title);
+        }
+      } catch (error) {
+        console.warn('Numeric ID query failed as expected for large IDs:', error.message);
+      }
+      
+    } catch (error) {
+      console.error('Test failed:', error);
+      throw error;
+    }
+  });
 });

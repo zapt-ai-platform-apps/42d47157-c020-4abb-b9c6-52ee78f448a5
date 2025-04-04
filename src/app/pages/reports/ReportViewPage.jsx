@@ -51,7 +51,14 @@ export default function ReportViewPage() {
       } catch (err) {
         console.error('Error fetching report data:', err);
         Sentry.captureException(err);
-        setError(err.message || 'Failed to load report data. Please try again later.');
+        
+        // Provide a more user-friendly error message
+        let userMessage = 'Failed to load report data. Please try again later.';
+        if (err.message === 'Report not found' || err.message === 'Report not found for your account') {
+          userMessage = 'This report could not be found. It may have been deleted or may not be associated with your account.';
+        }
+        
+        setError(userMessage);
       } finally {
         setLoading(false);
       }
