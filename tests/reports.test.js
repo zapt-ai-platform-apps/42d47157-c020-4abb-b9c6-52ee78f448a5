@@ -190,4 +190,40 @@ describe('Reports API Handler', () => {
     expect(mockRes.status).toHaveBeenCalledWith(404);
     expect(mockRes.json).toHaveBeenCalledWith({ error: 'Report not found' });
   });
+  
+  it('should convert BigInt values to strings in the response', async () => {
+    // Setup
+    mockReq.method = 'GET';
+    
+    // Create a response with a BigInt
+    const responseMock = [{ 
+      id: BigInt('1060536072299642900'), 
+      title: 'Test Report' 
+    }];
+    
+    // Mock the database to return our response
+    mockDB.select.mockImplementationOnce(() => ({
+      ...mockDB,
+      from: vi.fn(() => ({
+        ...mockDB,
+        where: vi.fn(() => ({
+          ...mockDB,
+          orderBy: vi.fn(() => responseMock)
+        }))
+      }))
+    }));
+
+    // Execute
+    await handler(mockReq, mockRes);
+
+    // Assert
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    // JSON.stringify should have been called with an object where BigInt is converted to string
+    expect(mockRes.json).toHaveBeenCalled();
+    // Get the first argument passed to json
+    const jsonArg = mockRes.json.mock.calls[0][0];
+    // Expect id to be a string, not a BigInt
+    expect(typeof jsonArg[0].id).toBe('string');
+    expect(jsonArg[0].id).toBe('1060536072299642900');
+  });
 });

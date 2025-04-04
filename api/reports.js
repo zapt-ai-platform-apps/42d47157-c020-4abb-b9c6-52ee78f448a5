@@ -6,6 +6,35 @@ import Sentry from './_sentry.js';
 import { eq, and, between, desc, or } from 'drizzle-orm';
 import { formatDateForDB } from './_dateUtils.js';
 
+/**
+ * Recursively converts any BigInt values to strings in an object
+ * @param {any} data - The data to process
+ * @returns {any} - The processed data with BigInt values converted to strings
+ */
+function convertBigIntToString(data) {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  
+  if (typeof data === 'bigint') {
+    return data.toString();
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(item => convertBigIntToString(item));
+  }
+  
+  if (typeof data === 'object') {
+    const result = {};
+    for (const key in data) {
+      result[key] = convertBigIntToString(data[key]);
+    }
+    return result;
+  }
+  
+  return data;
+}
+
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/reports`);
   
@@ -130,12 +159,16 @@ export default async function handler(req, res) {
         }));
 
         console.log(`Successfully assembled report data for ID: ${reportId}`);
-        return res.status(200).json({
+        
+        // Convert any BigInt values to strings before returning the JSON response
+        const responseData = {
           report,
           medications: medicationsList,
           sideEffects: formattedSideEffects,
           checkins: checkinsList
-        });
+        };
+        
+        return res.status(200).json(convertBigIntToString(responseData));
       }
       
       // Otherwise return the list of reports
@@ -146,7 +179,8 @@ export default async function handler(req, res) {
         .orderBy(desc(reports.createdAt));
       
       console.log(`Found ${result.length} reports`);
-      return res.status(200).json(result);
+      // Convert any BigInt values to strings
+      return res.status(200).json(convertBigIntToString(result));
     }
     
     // POST request - create a new report
@@ -168,7 +202,8 @@ export default async function handler(req, res) {
         .returning();
 
       console.log(`Created report with ID: ${result[0].id} (type: ${typeof result[0].id})`);
-      return res.status(201).json(result[0]);
+      // Convert any BigInt values to strings
+      return res.status(201).json(convertBigIntToString(result[0]));
     }
 
     // DELETE request - delete a report
@@ -201,7 +236,8 @@ export default async function handler(req, res) {
         }
 
         console.log(`Successfully deleted report with ID: ${reportId}`);
-        return res.status(200).json({ success: true });
+        // Convert any BigInt values to strings
+        return res.status(200).json(convertBigIntToString({ success: true }));
       } catch (error) {
         console.error(`Error deleting report with ID ${id}:`, error);
         Sentry.captureException(error);
