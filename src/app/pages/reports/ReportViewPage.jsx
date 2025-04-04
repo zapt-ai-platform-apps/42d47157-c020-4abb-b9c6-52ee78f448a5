@@ -14,12 +14,17 @@ export default function ReportViewPage() {
   useEffect(() => {
     const fetchReport = async () => {
       try {
-        console.log(`Attempting to fetch report with ID: ${id}`);
+        const reportId = String(id).trim();
+        console.log(`Attempting to fetch report with ID: ${reportId}`);
         const { data: { session } } = await supabase.auth.getSession();
         
-        const response = await fetch(`/api/reports?id=${id}&data=true`, {
+        if (!session?.access_token) {
+          throw new Error('No active session');
+        }
+        
+        const response = await fetch(`/api/reports?id=${reportId}&data=true`, {
           headers: {
-            Authorization: `Bearer ${session?.access_token}`
+            Authorization: `Bearer ${session.access_token}`
           }
         });
         
@@ -56,6 +61,8 @@ export default function ReportViewPage() {
         let userMessage = 'Failed to load report data. Please try again later.';
         if (err.message === 'Report not found' || err.message === 'Report not found for your account') {
           userMessage = 'This report could not be found. It may have been deleted or may not be associated with your account.';
+        } else if (err.message === 'No active session') {
+          userMessage = 'Your session has expired. Please log in again.';
         }
         
         setError(userMessage);

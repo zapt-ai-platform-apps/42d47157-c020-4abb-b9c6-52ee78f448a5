@@ -26,104 +26,60 @@ export default async function handler(req, res) {
         console.log(`Fetching full report data for report ID: ${id}`);
         console.log(`Report ID type: ${typeof id}, value: ${id}, user ID: ${user.id}`);
         
-        let reportId;
-        try {
-          // For large IDs, just validate the format without conversion
-          BigInt(id); // This validates it's a valid numeric string
-          
-          // Use the string ID directly to avoid any precision loss
-          reportId = id;
-          console.log(`Using string value directly for report ID: ${reportId}`);
-        } catch (error) {
-          console.error(`Error parsing report ID: ${id}`, error);
-          Sentry.captureException(error);
-          return res.status(400).json({ error: 'Invalid report ID format' });
-        }
-
-        // Get the report details - try both string and numeric approaches
-        let reportDetails = [];
+        // IMPORTANT: Always use the string version of the ID for database queries
+        // to avoid JavaScript number precision issues with large integers
+        const reportId = String(id).trim();
+        console.log(`Using string value for report ID: ${reportId}`);
         
-        // First attempt: Use string ID directly
-        try {
-          reportDetails = await db.select()
-            .from(reports)
-            .where(and(
-              eq(reports.id, reportId),
-              eq(reports.userId, user.id)
-            ));
-          
-          console.log(`Query with string ID returned ${reportDetails.length} reports`);
-        } catch (queryError) {
-          console.error('Error querying with string ID:', queryError);
-          Sentry.captureException(queryError);
-        }
+        // First check if the report exists for this user
+        const reportExists = await db.select({ exists: reports.id })
+          .from(reports)
+          .where(and(
+            eq(reports.userId, user.id)
+          ));
         
-        // If first attempt failed, try with numeric conversion
-        if (reportDetails.length === 0) {
-          try {
-            const numericId = Number(reportId);
-            reportDetails = await db.select()
-              .from(reports)
-              .where(and(
-                eq(reports.id, numericId),
-                eq(reports.userId, user.id)
-              ));
-            
-            console.log(`Query with numeric ID returned ${reportDetails.length} reports`);
-          } catch (numericQueryError) {
-            console.error('Error querying with numeric ID:', numericQueryError);
-            Sentry.captureException(numericQueryError);
-          }
-        }
+        console.log(`Found ${reportExists.length} reports for user ${user.id}`);
         
-        // If we still have no results, do some diagnostics
+        // Get the report details
+        const reportDetails = await db.select()
+          .from(reports)
+          .where(and(
+            eq(reports.id, reportId),
+            eq(reports.userId, user.id)
+          ));
+        
+        console.log(`Query returned ${reportDetails.length} reports`);
+        
+        // If no report found, do some diagnostics
         if (reportDetails.length === 0) {
           console.log(`No report found with ID ${reportId} for user ${user.id}`);
           
-          // Check if the report exists for any user
-          try {
-            const allReportsWithId = await db.select()
-              .from(reports)
-              .where(eq(reports.id, reportId));
-            
-            if (allReportsWithId.length > 0) {
-              console.log(`Report exists but belongs to user ${allReportsWithId[0].userId}, not ${user.id}`);
-              return res.status(404).json({ error: 'Report not found for your account' });
-            } else {
-              // Try numeric ID for all users as well
-              const numericId = Number(reportId);
-              const allReportsWithNumericId = await db.select()
-                .from(reports)
-                .where(eq(reports.id, numericId));
-              
-              if (allReportsWithNumericId.length > 0) {
-                console.log(`Report exists with numeric ID but belongs to user ${allReportsWithNumericId[0].userId}, not ${user.id}`);
-                return res.status(404).json({ error: 'Report not found for your account' });
-              }
-              
-              console.log(`No report with ID ${reportId} exists in the database at all`);
-              
-              // List a few reports for this user to check the ID format
-              const userReports = await db.select({
-                id: reports.id,
-                title: reports.title
-              })
-                .from(reports)
-                .where(eq(reports.userId, user.id))
-                .limit(5);
-              
-              if (userReports.length > 0) {
-                console.log(`Sample reports for user ${user.id}:`);
-                userReports.forEach((r, i) => {
-                  console.log(`[${i}] ID: ${r.id} (${typeof r.id}), Title: ${r.title}`);
-                });
-              } else {
-                console.log(`User ${user.id} has no reports in the database`);
-              }
-            }
-          } catch (diagnosticError) {
-            console.error('Error during diagnostic queries:', diagnosticError);
-            Sentry.captureException(diagnosticError);
+          // Check if this report exists at all (for any user)
+          const reportForAnyUser = await db.select({ userId: reports.userId })
+            .from(reports)
+            .where(eq(reports.id, reportId));
+          
+          if (reportForAnyUser.length > 0) {
+            console.log(`Report exists but belongs to user ${reportForAnyUser[0].userId}, not ${user.id}`);
+            return res.status(404).json({ error: 'Report not found for your account' });
+          }
+          
+          // List available reports for debugging
+          const userReports = await db.select({
+            id: reports.id,
+            title: reports.title
+          })
+            .from(reports)
+            .where(eq(reports.userId, user.id))
+            .limit(5);
+          
+          if (userReports.length > 0) {
+            console.log(`Sample reports for user ${user.id}:`);
+            userReports.forEach((r, i) => {
+              console.log(`[${i}] ID: ${r.id} (${typeof r.id}), Title: ${r.title}`);
+            });
+          } else {
+            console.log(`User ${user.id} has no reports in the database`);
           }
           
           return res.status(404).json({ error: 'Report not found' });
@@ -225,17 +181,9 @@ export default async function handler(req, res) {
       }
 
       try {
-        // Use string ID directly to avoid precision issues
-        let reportId;
-        try {
-          // Just validate the format
-          BigInt(id);
-          reportId = id; // Use string directly
-          console.log(`Using string directly for report ID: ${reportId}`);
-        } catch (error) {
-          console.error(`Error parsing report ID: ${id}`, error);
-          return res.status(400).json({ error: 'Invalid report ID format' });
-        }
+        // Use string ID to avoid precision issues
+        const reportId = String(id).trim();
+        console.log(`Using string for report ID: ${reportId}`);
 
         // Attempt to delete the report
         const result = await db.delete(reports)

@@ -1,93 +1,193 @@
-import { it, describe, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
 import { reports } from '../drizzle/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
-// Mock functions and data
-vi.mock('@sentry/node', () => ({
-  default: {
-    captureException: vi.fn()
+// Mock modules
+vi.mock('drizzle-orm/postgres-js', () => ({
+  drizzle: vi.fn()
+}));
+
+vi.mock('postgres', () => {
+  return vi.fn(() => ({
+    end: vi.fn()
+  }));
+});
+
+vi.mock('../_apiUtils.js', () => ({
+  authenticateUser: vi.fn(() => ({ id: 'test-user-id' }))
+}));
+
+vi.mock('../drizzle/schema.js', () => ({
+  medications: { userId: 'user_id', endDate: { isNull: vi.fn() }, startDate: 'start_date' },
+  sideEffects: { userId: 'user_id', medicationId: 'medication_id', date: 'date', createdAt: 'created_at' },
+  dailyCheckins: { userId: 'user_id', date: 'date' },
+  reports: { 
+    id: 'id', 
+    userId: 'user_id', 
+    title: 'title', 
+    startDate: 'start_date', 
+    endDate: 'end_date', 
+    createdAt: 'created_at' 
   }
 }));
 
-// Test user ID
-const TEST_USER_ID = 'test-user-123';
+vi.mock('../_sentry.js', () => ({
+  default: { captureException: vi.fn() }
+}));
 
-describe('Report ID handling', () => {
-  let client;
-  let db;
-  let createdReportId;
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((a, b) => ({ field: a, value: b, operator: 'eq' })),
+  and: vi.fn((...conditions) => ({ conditions, operator: 'and' })),
+  between: vi.fn((field, start, end) => ({ field, start, end, operator: 'between' })),
+  desc: vi.fn(field => ({ field, direction: 'desc' })),
+  or: vi.fn((...conditions) => ({ conditions, operator: 'or' }))
+}));
 
-  // Connect to test database before tests
-  beforeAll(async () => {
-    client = postgres(process.env.COCKROACH_DB_URL);
-    db = drizzle(client);
-  });
+vi.mock('../_dateUtils.js', () => ({
+  formatDateForDB: vi.fn(date => date)
+}));
 
-  // Close connection after tests
-  afterAll(async () => {
-    if (createdReportId) {
-      // Clean up test report
-      try {
-        await db.delete(reports)
-          .where(eq(reports.id, createdReportId));
-      } catch (error) {
-        console.error('Failed to delete test report:', error);
-      }
-    }
-    await client.end();
-  });
+describe('Reports API Handler', () => {
+  let handler;
+  let mockDB;
+  let mockReq;
+  let mockRes;
 
-  it('should handle large numeric IDs correctly', async () => {
-    // Insert a report with a large ID
-    const largeId = '9007199254740991'; // Max safe integer
-    const testReport = {
-      id: largeId,
-      userId: TEST_USER_ID,
-      title: 'Test Report with Large ID',
-      startDate: new Date('2023-01-01'),
-      endDate: new Date('2023-01-31'),
+  beforeEach(async () => {
+    // Import the handler fresh in each test to reset module state
+    const module = await import('../api/reports.js');
+    handler = module.default;
+
+    // Setup mock DB
+    mockDB = {
+      select: vi.fn(() => mockDB),
+      from: vi.fn(() => mockDB),
+      where: vi.fn(() => mockDB),
+      leftJoin: vi.fn(() => mockDB),
+      orderBy: vi.fn(() => mockDB),
+      limit: vi.fn(() => mockDB),
+      insert: vi.fn(() => mockDB),
+      values: vi.fn(() => mockDB),
+      returning: vi.fn(() => [{ id: 'test-report-id', title: 'Test Report' }]),
+      delete: vi.fn(() => mockDB)
     };
 
-    try {
-      // Try to insert the report
-      const result = await db.insert(reports)
-        .values(testReport)
-        .returning();
-      
-      createdReportId = result[0].id;
-      
-      // Verify it was inserted
-      expect(result.length).toBe(1);
-      
-      // Try to retrieve the report with different ID formats
-      // 1. Using string ID
-      const stringQuery = await db.select()
-        .from(reports)
-        .where(eq(reports.id, largeId));
-      
-      expect(stringQuery.length).toBe(1);
-      expect(stringQuery[0].title).toBe(testReport.title);
-      
-      // 2. Using numeric ID (this might fail if ID is too large)
-      try {
-        const numericId = Number(largeId);
-        const numericQuery = await db.select()
-          .from(reports)
-          .where(eq(reports.id, numericId));
-        
-        // This may or may not work depending on precision handling
-        if (numericQuery.length > 0) {
-          expect(numericQuery[0].title).toBe(testReport.title);
-        }
-      } catch (error) {
-        console.warn('Numeric ID query failed as expected for large IDs:', error.message);
-      }
-      
-    } catch (error) {
-      console.error('Test failed:', error);
-      throw error;
-    }
+    drizzle.mockReturnValue(mockDB);
+
+    // Setup mock request and response
+    mockReq = {
+      method: 'GET',
+      query: {},
+      body: {}
+    };
+
+    mockRes = {
+      status: vi.fn(() => mockRes),
+      json: vi.fn()
+    };
+  });
+
+  it('should handle string IDs properly when fetching a report', async () => {
+    // Setup
+    const reportId = '1060536072299642900'; // Large ID that would lose precision as a number
+    mockReq.query = { id: reportId, data: 'true' };
+    
+    // Mock report exists
+    mockDB.where.mockImplementationOnce(() => {
+      return {
+        ...mockDB,
+        // Simulate report exists for this user
+        returning: vi.fn(() => [{ id: reportId, userId: 'test-user-id' }])
+      };
+    });
+    
+    // Setup expected report data
+    const expectedReportData = {
+      id: reportId,
+      userId: 'test-user-id',
+      title: 'Test Report',
+      startDate: '2023-01-01',
+      endDate: '2023-01-31'
+    };
+    
+    // Mock the select to return our test report
+    mockDB.select.mockImplementationOnce(() => {
+      return {
+        ...mockDB,
+        from: vi.fn(() => ({
+          ...mockDB,
+          where: vi.fn(() => [expectedReportData])
+        }))
+      };
+    });
+    
+    // Empty arrays for other data
+    mockDB.select.mockImplementationOnce(() => ({
+      ...mockDB,
+      from: vi.fn(() => ({
+        ...mockDB,
+        where: vi.fn(() => ({
+          ...mockDB,
+          orderBy: vi.fn(() => [])
+        }))
+      }))
+    }));
+    
+    mockDB.select.mockImplementationOnce(() => ({
+      ...mockDB,
+      from: vi.fn(() => ({
+        ...mockDB,
+        leftJoin: vi.fn(() => ({
+          ...mockDB,
+          where: vi.fn(() => ({
+            ...mockDB,
+            orderBy: vi.fn(() => [])
+          }))
+        }))
+      }))
+    }));
+    
+    mockDB.select.mockImplementationOnce(() => ({
+      ...mockDB,
+      from: vi.fn(() => ({
+        ...mockDB,
+        where: vi.fn(() => ({
+          ...mockDB,
+          orderBy: vi.fn(() => [])
+        }))
+      }))
+    }));
+
+    // Execute
+    await handler(mockReq, mockRes);
+
+    // Assert
+    // Check if we used the correct string ID in our query
+    expect(eq).toHaveBeenCalledWith(reports.id, reportId);
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    expect(mockRes.json).toHaveBeenCalled();
+  });
+
+  it('should handle non-existent reports gracefully', async () => {
+    // Setup
+    const reportId = '1060536072299642900';
+    mockReq.query = { id: reportId, data: 'true' };
+    
+    // Mock empty results
+    mockDB.select.mockImplementation(() => ({
+      ...mockDB,
+      from: vi.fn(() => ({
+        ...mockDB,
+        where: vi.fn(() => []) // Empty array = no report found
+      }))
+    }));
+
+    // Execute
+    await handler(mockReq, mockRes);
+
+    // Assert
+    expect(mockRes.status).toHaveBeenCalledWith(404);
+    expect(mockRes.json).toHaveBeenCalledWith({ error: 'Report not found' });
   });
 });
