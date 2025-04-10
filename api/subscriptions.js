@@ -104,11 +104,9 @@ export default async function handler(req, res) {
           metadata: {
             userId: user.id,
           },
-          subscription_data: {
-            application_fee_percent: 30,
-            transfer_data: {
-              destination: 'acct_1Myei9AwvseTMg9w', // Your platform account ID
-            }
+          payment_intent_data: {
+            // application_fee_amount: calculateFeeAmount(), // Calculate 30% of the price
+            application_fee_amount: 1.20, // Calculate 30% of the price
           }
         });
         
