@@ -106,7 +106,8 @@ export default async function handler(req, res) {
           },
           subscription_data: {
             application_fee_percent: 30, // Take 30% as application fee
-          }
+          },
+          on_behalf_of: 'acct_1Myei9AwvseTMg9w'
         });
         
         console.log(`Created checkout session: ${session.id}, URL: ${session.url}`);
