@@ -87,8 +87,10 @@ export default async function handler(req, res) {
       try {
         // Initialize the Stripe client with the API key
         console.log('Creating Stripe checkout session...');
+
+        const stripeCheckout = new Stripe(process.env.STRIPE_API_KEY_CHECKOUTS);
         
-        const session = await stripe.checkout.sessions.create({
+        const session = await stripeCheckout.checkout.sessions.create({
           payment_method_types: ['card'],
           line_items: [
             {
@@ -105,10 +107,11 @@ export default async function handler(req, res) {
             userId: user.id,
           },
           subscription_data: {
-            application_fee_percent: 30
+            application_fee_percent: 30,
+            transfer_data: { destination: 'acct_1RBjPHB1e4Ppxoh0' },
+            on_behalf_of: 'acct_1RBjPHB1e4Ppxoh0',
           }
-        },
-          { stripeAccount: 'acct_1Myei9AwvseTMg9w' }
+        }
         );
         
         console.log(`Created checkout session: ${session.id}, URL: ${session.url}`);
