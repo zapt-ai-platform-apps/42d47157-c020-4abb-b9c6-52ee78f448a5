@@ -106,7 +106,7 @@ export default async function handler(req, res) {
           },
           payment_intent_data: {
             // application_fee_amount: calculateFeeAmount(), // Calculate 30% of the price
-            application_fee_amount: 1.20, // Calculate 30% of the price
+            application_fee_amount: 120, // $1.20 in cents (must be an integer)
           }
         });
         
