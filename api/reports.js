@@ -12,7 +12,7 @@ import Stripe from 'stripe';
  * @param {any} data - The data to process
  * @returns {any} - The processed data with BigInt values converted to strings
  */
-function convertBigIntToString(data) {
+export function convertBigIntToString(data) {
   if (data === null || data === undefined) {
     return data;
   }

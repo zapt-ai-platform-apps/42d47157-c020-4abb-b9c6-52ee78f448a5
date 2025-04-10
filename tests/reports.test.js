@@ -49,6 +49,10 @@ vi.mock('../drizzle/schema.js', () => ({
     userId: 'user_id',
     createdAt: 'created_at',
   },
+  userReportsCount: {
+    userId: 'user_id',
+    count: 'count',
+  }
 }));
 
 // Import the handler
@@ -196,9 +200,9 @@ describe('Reports API Handler', () => {
     const dataPassedToJson = mockRes.json.mock.calls[0][0];
     
     // Verify the date was preserved and not converted to an empty object
-    expect(dataPassedToJson[0].createdAt).toBeDefined();
-    expect(dataPassedToJson[0].createdAt instanceof Date || 
-           (typeof dataPassedToJson[0].createdAt === 'string' && !isNaN(new Date(dataPassedToJson[0].createdAt)))).toBe(true);
+    expect(dataPassedToJson.reports[0].createdAt).toBeDefined();
+    expect(dataPassedToJson.reports[0].createdAt instanceof Date || 
+           (typeof dataPassedToJson.reports[0].createdAt === 'string' && !isNaN(new Date(dataPassedToJson.reports[0].createdAt)))).toBe(true);
     
     // Response should be successful
     expect(mockRes.status).toHaveBeenCalledWith(200);
