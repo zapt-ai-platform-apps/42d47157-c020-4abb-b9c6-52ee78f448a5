@@ -42,10 +42,8 @@ export default function UpgradeModal({ isOpen, onClose }) {
       
       const checkoutSession = await response.json();
 
-      // For demo purposes, we'll just redirect to the dashboard with a success message
-      // In a real app, this would redirect to Stripe's checkout page
-      onClose();
-      navigate('/dashboard?subscription=success');
+      // Redirect to Stripe checkout page
+      window.location.href = checkoutSession.url;
       
     } catch (error) {
       console.error('Error creating subscription:', error);
@@ -90,7 +88,7 @@ export default function UpgradeModal({ isOpen, onClose }) {
                     selectedCurrency === 'GBP'
                       ? 'bg-indigo-100 text-indigo-700'
                       : 'bg-white text-gray-700 border border-gray-300'
-                  }`}
+                  } cursor-pointer`}
                 >
                   GBP (£)
                 </button>
@@ -100,7 +98,7 @@ export default function UpgradeModal({ isOpen, onClose }) {
                     selectedCurrency === 'USD'
                       ? 'bg-indigo-100 text-indigo-700'
                       : 'bg-white text-gray-700 border border-gray-300'
-                  }`}
+                  } cursor-pointer`}
                 >
                   USD ($)
                 </button>

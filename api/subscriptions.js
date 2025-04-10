@@ -4,6 +4,7 @@ import { subscriptions } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq } from 'drizzle-orm';
+import Stripe from 'stripe';
 
 const PRICE_IDS = {
   GBP: 'price_1RCJSQB1e4Ppxoh03bw4Z9HF',
@@ -49,22 +50,33 @@ export default async function handler(req, res) {
 
       console.log(`Creating checkout session for user: ${user.id}, currency: ${currency}`);
       
-      // In a real implementation, we would create a Stripe checkout session here
-      // This is a simplified version for demonstration purposes
-      const mockCheckoutSession = {
-        id: `cs_mock_${Date.now()}`,
-        url: returnUrl || '/#subscription-success', // This would be the Stripe checkout URL
-        currency: currency,
-        priceId: PRICE_IDS[currency]
-      };
+      // Initialize the Stripe client with the API key
+      const stripe = new Stripe(process.env.STRIPE_API_KEY);
       
-      // In a real implementation, we would not create the subscription record
-      // until the webhook confirms the payment was successful
-      // This is just for demonstration purposes
+      // Create the checkout session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: PRICE_IDS[currency],
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${returnUrl || 'https://sidetrack.zapt.ai/dashboard'}?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${returnUrl?.split('?')[0] || 'https://sidetrack.zapt.ai/dashboard'}?canceled=true`,
+        customer_email: user.email,
+        client_reference_id: user.id,
+        metadata: {
+          userId: user.id,
+        },
+      });
+      
+      // Create a pending subscription record in the database
       const result = await db.insert(subscriptions)
         .values({
           userId: user.id,
-          status: 'incomplete',  // Would be updated by webhook
+          status: 'incomplete',  // Will be updated by webhook
           plan: 'standard',
           currency: currency,
           createdAt: new Date().toISOString(),
@@ -73,7 +85,10 @@ export default async function handler(req, res) {
         .returning();
 
       console.log(`Created subscription record with ID: ${result[0].id}`);
-      return res.status(200).json(mockCheckoutSession);
+      return res.status(200).json({
+        id: session.id,
+        url: session.url
+      });
     }
 
     // PATCH request - update subscription status (this would be called by a webhook)

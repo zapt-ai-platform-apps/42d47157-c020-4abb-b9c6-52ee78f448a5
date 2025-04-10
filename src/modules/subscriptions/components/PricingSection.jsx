@@ -45,9 +45,8 @@ export default function PricingSection({ className = "", isPage = false }) {
       
       const checkoutSession = await response.json();
 
-      // For demo purposes, we'll just redirect to the dashboard with a success message
-      // In a real app, this would redirect to Stripe's checkout page
-      navigate('/dashboard?subscription=success');
+      // Redirect to Stripe checkout page
+      window.location.href = checkoutSession.url;
       
     } catch (error) {
       console.error('Error creating subscription:', error);
@@ -145,7 +144,7 @@ export default function PricingSection({ className = "", isPage = false }) {
                     selectedCurrency === 'GBP' 
                       ? 'bg-indigo-600 text-white font-medium' 
                       : 'bg-white text-gray-700 border border-gray-300'
-                  }`}
+                  } cursor-pointer`}
                 >
                   GBP (£)
                 </button>
@@ -155,7 +154,7 @@ export default function PricingSection({ className = "", isPage = false }) {
                     selectedCurrency === 'USD' 
                       ? 'bg-indigo-600 text-white font-medium' 
                       : 'bg-white text-gray-700 border border-gray-300'
-                  }`}
+                  } cursor-pointer`}
                 >
                   USD ($)
                 </button>
