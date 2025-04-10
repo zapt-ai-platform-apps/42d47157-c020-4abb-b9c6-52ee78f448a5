@@ -108,8 +108,7 @@ export default async function handler(req, res) {
           },
           subscription_data: {
             application_fee_percent: 30,
-            transfer_data: { destination: 'acct_1RBjPHB1e4Ppxoh0' },
-            on_behalf_of: 'acct_1RBjPHB1e4Ppxoh0',
+            transfer_data: { destination: 'acct_1RBjPHB1e4Ppxoh0' }
           }
         }, {
           stripeAccount: 'acct_1RBjPHB1e4Ppxoh0'
