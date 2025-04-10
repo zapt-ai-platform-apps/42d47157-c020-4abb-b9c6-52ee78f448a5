@@ -126,7 +126,8 @@ async function checkReportLimit(db, userId, userEmail) {
         .values({
           userId: userId,
           count: 0,
-          updatedAt: new Date().toISOString()
+          // FIX: Use Date object instead of string for timestamp field
+          updatedAt: new Date()
         })
         .returning();
     } else {
@@ -169,14 +170,16 @@ async function incrementReportCount(db, userId) {
       .values({
         userId: userId,
         count: 1,
-        updatedAt: new Date().toISOString()
+        // FIX: Use Date object instead of string for timestamp field
+        updatedAt: new Date()
       });
   } else {
     // Increment the existing count
     await db.update(userReportsCount)
       .set({
         count: userReportCount[0].count + 1,
-        updatedAt: new Date().toISOString()
+        // FIX: Use Date object instead of string for timestamp field
+        updatedAt: new Date()
       })
       .where(eq(userReportsCount.userId, userId));
   }

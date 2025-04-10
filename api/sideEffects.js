@@ -256,7 +256,8 @@ export default async function handler(req, res) {
           timeOfDay,
           date: formattedDate, // Use the formatted date string
           notes,
-          updatedAt: new Date().toISOString(), // Format the updatedAt date as well
+          // FIX: Use Date object instead of string for updatedAt
+          updatedAt: new Date(),
         })
         .where(eq(sideEffects.id, id))
         .returning();

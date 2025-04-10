@@ -70,8 +70,8 @@ export default async function handler(req, res) {
       const formattedStartDate = ensureDateString(startDate);
       const formattedEndDate = endDate ? ensureDateString(endDate) : null;
 
-      // Get current timestamp as ISO string for updatedAt
-      const now = new Date().toISOString();
+      // FIX: Use Date object instead of string for updatedAt
+      const now = new Date();
 
       const result = await db.update(medications)
         .set({
