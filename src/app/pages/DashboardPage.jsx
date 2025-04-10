@@ -4,6 +4,7 @@ import { useAuthContext } from '@/modules/auth';
 import { format } from 'date-fns';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
+import { ManageSubscriptionButton } from '@/modules/subscriptions';
 
 export default function DashboardPage() {
   const { user } = useAuthContext();
@@ -15,6 +16,7 @@ export default function DashboardPage() {
   });
   const [recentSideEffects, setRecentSideEffects] = useState([]);
   const [loadingRecentSideEffects, setLoadingRecentSideEffects] = useState(true);
+  const [subscription, setSubscription] = useState(null);
   
   useEffect(() => {
     const fetchStats = async () => {
@@ -92,7 +94,7 @@ export default function DashboardPage() {
           }));
         });
         
-        // Fetch reports count
+        // Fetch reports count and subscription status
         const fetchReports = fetch('/api/reports', {
           headers: {
             Authorization: `Bearer ${session?.access_token}`
@@ -105,6 +107,7 @@ export default function DashboardPage() {
             ...prev,
             reports: { count: data.reports.length, loading: false }
           }));
+          setSubscription(data.subscription);
         })
         .catch(error => {
           console.error('Error fetching reports:', error);
@@ -137,6 +140,19 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">Welcome to SideTrack</h1>
         <p className="text-gray-600 mt-1">Track medication side effects and create doctor-ready reports</p>
       </div>
+      
+      {/* Subscription status for premium users */}
+      {subscription?.hasActiveSubscription && (
+        <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="font-medium text-indigo-700">Standard Plan Active</span>
+              <p className="text-sm text-indigo-600 mt-1">You have unlimited access to all premium features</p>
+            </div>
+            <ManageSubscriptionButton />
+          </div>
+        </div>
+      )}
       
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

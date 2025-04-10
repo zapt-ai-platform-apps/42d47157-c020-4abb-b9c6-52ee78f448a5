@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
-import { CurrencyModal } from '@/modules/subscriptions';
+import { CurrencyModal, ManageSubscriptionButton } from '@/modules/subscriptions';
 
 export default function Layout({ children }) {
   const { user, signOut } = useAuthContext();
@@ -11,6 +11,40 @@ export default function Layout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  
+  useEffect(() => {
+    // Only fetch subscription status if user is logged in
+    if (user) {
+      const fetchSubscriptionStatus = async () => {
+        try {
+          setSubscriptionLoading(true);
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          const response = await fetch('/api/subscriptions', {
+            headers: {
+              Authorization: `Bearer ${session?.access_token}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch subscription status');
+          }
+          
+          const data = await response.json();
+          setSubscriptionStatus(data);
+        } catch (error) {
+          console.error('Error fetching subscription status:', error);
+          Sentry.captureException(error);
+        } finally {
+          setSubscriptionLoading(false);
+        }
+      };
+      
+      fetchSubscriptionStatus();
+    }
+  }, [user]);
   
   const handleSignOut = async () => {
     try {
@@ -117,13 +151,19 @@ export default function Layout({ children }) {
                   <NavLink to="/side-effects" className={navLinkClass}>Side Effects</NavLink>
                   <NavLink to="/daily-checkins" className={navLinkClass}>Daily Check-ins</NavLink>
                   <NavLink to="/reports" className={navLinkClass}>Reports</NavLink>
-                  <button
-                    onClick={handleDirectUpgrade}
-                    disabled={isUpgradeLoading}
-                    className={`${navLinkClass({ isActive: false })} cursor-pointer`}
-                  >
-                    {isUpgradeLoading ? 'Processing...' : 'Upgrade'}
-                  </button>
+                  
+                  {subscriptionStatus?.hasActiveSubscription ? (
+                    <ManageSubscriptionButton className="py-1 px-3 text-sm" />
+                  ) : (
+                    <button
+                      onClick={handleDirectUpgrade}
+                      disabled={isUpgradeLoading}
+                      className={`${navLinkClass({ isActive: false })} cursor-pointer`}
+                    >
+                      {isUpgradeLoading ? 'Processing...' : 'Upgrade'}
+                    </button>
+                  )}
+                  
                   <button 
                     onClick={handleSignOut}
                     className="text-gray-600 hover:text-gray-900 cursor-pointer"
@@ -213,16 +253,24 @@ export default function Layout({ children }) {
             >
               Reports
             </NavLink>
-            <button 
-              onClick={(e) => {
-                closeMobileMenu();
-                handleDirectUpgrade(e);
-              }}
-              disabled={isUpgradeLoading}
-              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 cursor-pointer"
-            >
-              {isUpgradeLoading ? 'Processing...' : 'Upgrade'}
-            </button>
+            
+            {subscriptionStatus?.hasActiveSubscription ? (
+              <div className="px-3 py-2">
+                <ManageSubscriptionButton className="w-full" />
+              </div>
+            ) : (
+              <button 
+                onClick={(e) => {
+                  closeMobileMenu();
+                  handleDirectUpgrade(e);
+                }}
+                disabled={isUpgradeLoading}
+                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 cursor-pointer"
+              >
+                {isUpgradeLoading ? 'Processing...' : 'Upgrade'}
+              </button>
+            )}
+            
             <button 
               onClick={() => {
                 handleSignOut();

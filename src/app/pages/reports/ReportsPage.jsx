@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportList } from '@/modules/reports';
-import { SubscriptionBanner } from '@/modules/subscriptions';
+import { SubscriptionBanner, ManageSubscriptionButton } from '@/modules/subscriptions';
 import ConfirmDialog from '@/modules/core/components/ConfirmDialog';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
@@ -132,6 +132,18 @@ export default function ReportsPage() {
           reportsCreated={subscription.reportsCreated} 
           limit={subscription.limit} 
         />
+      )}
+      
+      {subscription && subscription.hasActiveSubscription && (
+        <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="font-medium text-indigo-700">Standard Plan</span>
+              <p className="text-sm text-indigo-600 mt-1">Unlimited reports and premium features</p>
+            </div>
+            <ManageSubscriptionButton />
+          </div>
+        </div>
       )}
       
       {error && (
