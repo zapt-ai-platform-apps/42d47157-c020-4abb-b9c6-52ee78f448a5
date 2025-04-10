@@ -103,7 +103,11 @@ export default async function handler(req, res) {
           client_reference_id: user.id,
           metadata: {
             userId: user.id,
-          }
+          },
+          // Add the application fee percentage (30%)
+          application_fee_percent: 30,
+          // Specify your platform account that will receive the fee
+          application_fee_account: 'acct_1Myei9AwvseTMg9w',
         });
         
         console.log(`Created checkout session: ${session.id}, URL: ${session.url}`);
