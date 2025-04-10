@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { PricingSection } from '@/modules/subscriptions';
 
 export default function LandingPage() {
   return (
@@ -100,6 +101,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Pricing Section */}
+      <PricingSection />
 
       {/* Testimonials Section */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
@@ -229,7 +233,7 @@ export default function LandingPage() {
             <div>
               <h3 className="text-lg font-medium mb-4">Resources</h3>
               <ul className="space-y-2">
-                <li><Link to="/login" className="text-gray-400 hover:text-white transition-colors">Help Center</Link></li>
+                <li><Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link></li>
                 <li><Link to="/login" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/login" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
                 <li><Link to="/login" className="text-gray-400 hover:text-white transition-colors">Contact Us</Link></li>

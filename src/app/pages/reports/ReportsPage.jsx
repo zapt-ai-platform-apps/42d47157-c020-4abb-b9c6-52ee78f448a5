@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportList } from '@/modules/reports';
+import { SubscriptionBanner } from '@/modules/subscriptions';
 import ConfirmDialog from '@/modules/core/components/ConfirmDialog';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
@@ -13,6 +14,7 @@ export default function ReportsPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reportToDelete, setReportToDelete] = useState(null);
+  const [subscription, setSubscription] = useState(null);
   
   useEffect(() => {
     fetchReports();
@@ -36,13 +38,24 @@ export default function ReportsPage() {
       }
       
       const data = await response.json();
-      setReports(data);
+      console.log('Reports data:', data);
+      setReports(data.reports || []);
+      setSubscription(data.subscription);
     } catch (err) {
       console.error('Error fetching reports:', err);
       Sentry.captureException(err);
       setError('Failed to load reports. Please try again later.');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const handleCreateReport = () => {
+    if (subscription && !subscription.canCreateReport && !subscription.hasActiveSubscription) {
+      // User has reached their limit and doesn't have a subscription
+      navigate('/pricing');
+    } else {
+      navigate('/reports/create');
     }
   };
   
@@ -86,6 +99,9 @@ export default function ReportsPage() {
       
       console.log('Report deleted successfully');
       setReports(reports.filter(report => report.id !== reportToDelete.id));
+      
+      // Refresh subscription status (report count has changed)
+      fetchReports();
     } catch (err) {
       console.error('Error deleting report:', err);
       Sentry.captureException(err);
@@ -93,6 +109,7 @@ export default function ReportsPage() {
     } finally {
       setDeletingId(null);
       setReportToDelete(null);
+      setConfirmDelete(false);
     }
   };
   
@@ -101,13 +118,21 @@ export default function ReportsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Doctor Reports</h1>
         <button
-          onClick={() => navigate('/reports/create')}
+          onClick={handleCreateReport}
           className="btn-primary cursor-pointer"
           disabled={deletingId !== null}
         >
           Create New Report
         </button>
       </div>
+      
+      {subscription && !subscription.hasActiveSubscription && (
+        <SubscriptionBanner 
+          canCreateReport={subscription.canCreateReport} 
+          reportsCreated={subscription.reportsCreated} 
+          limit={subscription.limit} 
+        />
+      )}
       
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-md mb-4">
@@ -126,6 +151,7 @@ export default function ReportsPage() {
           onView={handleView}
           onDelete={confirmDeleteReport}
           deletingId={deletingId}
+          subscription={subscription}
         />
       )}
       

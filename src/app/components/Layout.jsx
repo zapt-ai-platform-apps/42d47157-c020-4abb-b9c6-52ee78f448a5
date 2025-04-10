@@ -50,6 +50,7 @@ export default function Layout({ children }) {
                   <NavLink to="/side-effects" className={navLinkClass}>Side Effects</NavLink>
                   <NavLink to="/daily-checkins" className={navLinkClass}>Daily Check-ins</NavLink>
                   <NavLink to="/reports" className={navLinkClass}>Reports</NavLink>
+                  <NavLink to="/pricing" className={navLinkClass}>Pricing</NavLink>
                   <button 
                     onClick={handleSignOut}
                     className="text-gray-600 hover:text-gray-900 cursor-pointer"
@@ -138,6 +139,17 @@ export default function Layout({ children }) {
               onClick={closeMobileMenu}
             >
               Reports
+            </NavLink>
+            <NavLink 
+              to="/pricing" 
+              className={({ isActive }) => 
+                `block px-3 py-2 rounded-md text-base font-medium ${
+                  isActive ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`
+              }
+              onClick={closeMobileMenu}
+            >
+              Pricing
             </NavLink>
             <button 
               onClick={() => {

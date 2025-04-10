@@ -11,6 +11,7 @@ import {
   DashboardPage,
   LoginPage,
   LandingPage,
+  PricingPage,
   MedicationsPage,
   MedicationAddPage,
   MedicationEditPage,
@@ -38,6 +39,11 @@ export default function App() {
         <Route path="/login" element={
           <PublicRoute>
             <LoginPage />
+          </PublicRoute>
+        } />
+        <Route path="/pricing" element={
+          <PublicRoute>
+            <PricingPage />
           </PublicRoute>
         } />
 

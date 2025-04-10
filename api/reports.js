@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { medications, sideEffects, dailyCheckins, reports } from '../drizzle/schema.js';
+import { medications, sideEffects, dailyCheckins, reports, subscriptions, userReportsCount } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq, and, between, desc, or, isNull } from 'drizzle-orm';
@@ -38,6 +38,83 @@ function convertBigIntToString(data) {
   }
   
   return data;
+}
+
+// Check if user has reached free report limit and has no active subscription
+async function checkReportLimit(db, userId) {
+  // Check if user has an active subscription
+  const userSubscriptions = await db.select()
+    .from(subscriptions)
+    .where(and(
+      eq(subscriptions.userId, userId),
+      or(
+        eq(subscriptions.status, 'active'),
+        eq(subscriptions.status, 'trialing')
+      )
+    ));
+  
+  const hasActiveSubscription = userSubscriptions.length > 0;
+  
+  // If user has an active subscription, they can create unlimited reports
+  if (hasActiveSubscription) {
+    return { canCreateReport: true, hasActiveSubscription, reportsCreated: 0 };
+  }
+  
+  // Check how many reports the user has created
+  let userReportCount = await db.select()
+    .from(userReportsCount)
+    .where(eq(userReportsCount.userId, userId));
+  
+  let reportsCreated = 0;
+  
+  if (userReportCount.length === 0) {
+    // User hasn't created any reports yet, create a record
+    await db.insert(userReportsCount)
+      .values({
+        userId: userId,
+        count: 0,
+        updatedAt: new Date().toISOString()
+      })
+      .returning();
+  } else {
+    reportsCreated = userReportCount[0].count;
+  }
+  
+  // Free users are limited to 2 reports
+  const FREE_REPORT_LIMIT = 2;
+  
+  return {
+    canCreateReport: reportsCreated < FREE_REPORT_LIMIT,
+    hasActiveSubscription,
+    reportsCreated,
+    limit: FREE_REPORT_LIMIT
+  };
+}
+
+// Update user's report count
+async function incrementReportCount(db, userId) {
+  // Check if user has a record in userReportsCount
+  let userReportCount = await db.select()
+    .from(userReportsCount)
+    .where(eq(userReportsCount.userId, userId));
+  
+  if (userReportCount.length === 0) {
+    // User doesn't have a record yet, create one
+    await db.insert(userReportsCount)
+      .values({
+        userId: userId,
+        count: 1,
+        updatedAt: new Date().toISOString()
+      });
+  } else {
+    // Increment the existing count
+    await db.update(userReportsCount)
+      .set({
+        count: userReportCount[0].count + 1,
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(userReportsCount.userId, userId));
+  }
 }
 
 export default async function handler(req, res) {
@@ -204,9 +281,15 @@ export default async function handler(req, res) {
         .where(eq(reports.userId, user.id))
         .orderBy(desc(reports.createdAt));
       
+      // Check subscription status and report limit
+      const subscriptionStatus = await checkReportLimit(db, user.id);
+      
       console.log(`Found ${result.length} reports`);
       // Convert any BigInt values to strings
-      return res.status(200).json(convertBigIntToString(result));
+      return res.status(200).json({
+        reports: convertBigIntToString(result),
+        subscription: subscriptionStatus
+      });
     }
     
     // POST request - create a new report
@@ -218,6 +301,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Check if user has reached the report limit
+      const limitStatus = await checkReportLimit(db, user.id);
+      
+      if (!limitStatus.canCreateReport) {
+        return res.status(403).json({
+          error: 'You have reached the free report limit',
+          subscription: limitStatus
+        });
+      }
+
       try {
         const result = await db.insert(reports)
           .values({
@@ -227,6 +320,9 @@ export default async function handler(req, res) {
             endDate: formatDateForDB(endDate),
           })
           .returning();
+
+        // Increment the user's report count
+        await incrementReportCount(db, user.id);
 
         console.log(`Created report with ID: ${result[0].id} (type: ${typeof result[0].id})`);
         // Convert any BigInt values to strings
