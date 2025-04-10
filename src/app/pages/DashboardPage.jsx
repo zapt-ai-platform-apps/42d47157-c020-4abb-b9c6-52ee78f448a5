@@ -100,9 +100,10 @@ export default function DashboardPage() {
         })
         .then(res => res.json())
         .then(data => {
+          // Fix: The reports API returns an object with a "reports" property
           setStats(prev => ({
             ...prev,
-            reports: { count: data.length, loading: false }
+            reports: { count: data.reports.length, loading: false }
           }));
         })
         .catch(error => {

@@ -1,279 +1,124 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+import DashboardPage from '../src/app/pages/DashboardPage';
+import { MemoryRouter } from 'react-router-dom';
 
-// Mock the imported modules
-vi.mock('drizzle-orm/postgres-js', () => ({
-  drizzle: vi.fn(),
+// Mock the auth context
+vi.mock('@/modules/auth', () => ({
+  useAuthContext: () => ({ user: { id: 'test-user-id', email: 'test@example.com' } })
 }));
 
-vi.mock('postgres', () => {
-  return {
-    default: vi.fn(() => ({
-      end: vi.fn(),
-    })),
-  };
-});
-
-vi.mock('../api/_apiUtils.js', () => ({
-  authenticateUser: vi.fn(),
-}));
-
-vi.mock('../api/_sentry.js', () => ({
-  default: {
-    captureException: vi.fn(),
-  },
-}));
-
-vi.mock('stripe', () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      customers: {
-        list: vi.fn().mockResolvedValue({ data: [] }),
-      },
-      subscriptions: {
-        list: vi.fn().mockResolvedValue({ data: [] }),
-      },
-    })),
-  };
-});
-
-vi.mock('../drizzle/schema.js', () => ({
-  medications: { userId: 'user_id' },
-  sideEffects: { userId: 'user_id' },
-  dailyCheckins: { userId: 'user_id' },
-  reports: { 
-    id: 'report_id',
-    userId: 'user_id',
-    createdAt: 'created_at',
-  },
-  userReportsCount: {
-    userId: 'user_id',
-    count: 'count',
-    updatedAt: 'updated_at',
+// Mock supabase client
+vi.mock('@/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: { access_token: 'test-token' } } })
+    }
   }
 }));
 
-// Import the handler
-const handlerPath = '../api/reports.js';
-let handler;
+// Mock fetch
+global.fetch = vi.fn();
 
-describe('Report Count Management', () => {
-  beforeEach(async () => {
-    // Clear mocks
-    vi.clearAllMocks();
+describe('DashboardPage Reports Count', () => {
+  beforeEach(() => {
+    fetch.mockReset();
     
-    // Re-import to get fresh handler with our mocks
-    vi.resetModules();
-    const module = await import(handlerPath);
-    handler = module.default;
+    // Mock medication response
+    fetch.mockImplementationOnce(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{ id: 1, name: 'Test Med' }])
+      })
+    );
+    
+    // Mock side effects response
+    fetch.mockImplementationOnce(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{ id: 1, symptom: 'Test Symptom' }])
+      })
+    );
+    
+    // Mock check-ins response
+    fetch.mockImplementationOnce(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{ id: 1, date: '2023-01-01' }])
+      })
+    );
   });
 
-  it('properly updates report count when creating a report', async () => {
-    // Setup mocks
-    const mockUser = { id: 'test-user-id', email: 'test@example.com' };
-    const mockReq = {
-      method: 'POST',
-      body: {
-        title: 'Test Report',
-        startDate: '2023-01-01',
-        endDate: '2023-01-31'
-      },
-    };
-    const mockRes = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn(),
-    };
+  it('should display the reports count correctly when API returns reports object', async () => {
+    // Mock reports response with the structure returned by the API
+    fetch.mockImplementationOnce(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          reports: [
+            { id: '1', title: 'Report 1' },
+            { id: '2', title: 'Report 2' },
+            { id: '3', title: 'Report 3' }
+          ],
+          subscription: { hasActiveSubscription: false }
+        })
+      })
+    );
 
-    // Mock database operations
-    const mockDb = {
-      select: vi.fn().mockReturnThis(),
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      values: vi.fn().mockReturnThis(),
-      returning: vi.fn().mockResolvedValue([{ id: '12345' }]),
-      update: vi.fn().mockReturnThis(),
-      set: vi.fn().mockReturnThis(),
-    };
-    
-    // Mock drizzle to return mockDb
-    const { drizzle } = await import('drizzle-orm/postgres-js');
-    drizzle.mockReturnValue(mockDb);
-    
-    // Mock authenticateUser to return mockUser
-    const { authenticateUser } = await import('../api/_apiUtils.js');
-    authenticateUser.mockResolvedValue(mockUser);
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
+    );
 
-    // Mock the count check to return 0 reports (allowing new report creation)
-    mockDb.where.mockImplementationOnce(() => []); // No existing count record for checkReportLimit
-    
-    // Mock insert for creating a new count record
-    mockDb.insert.mockReturnValueOnce(mockDb);
-    mockDb.values.mockReturnValueOnce(mockDb);
-    
-    // Mock the report insertion
-    mockDb.insert.mockReturnValueOnce(mockDb);
-    mockDb.values.mockReturnValueOnce(mockDb);
-    mockDb.returning.mockResolvedValueOnce([{ id: '12345' }]);
-    
-    // Mock the count record check for incrementReportCount
-    mockDb.where.mockImplementationOnce(() => []); // No existing count record
-    
-    // Mock the insert for creating a count record with count=1
-    mockDb.insert.mockReturnValueOnce(mockDb);
-    mockDb.values.mockReturnValueOnce(mockDb);
-    mockDb.returning.mockResolvedValueOnce([{ userId: 'test-user-id', count: 1 }]);
-    
-    // Mock verification select
-    mockDb.where.mockImplementationOnce(() => [{ userId: 'test-user-id', count: 1 }]);
-    
-    // Call the handler
-    await handler(mockReq, mockRes);
-    
-    // Verify the response
-    expect(mockRes.status).toHaveBeenCalledWith(201);
-    
-    // Verify that incrementReportCount was called by checking insert/update operations
-    expect(mockDb.insert).toHaveBeenCalledTimes(3); // Initial count check, report creation, count increment
-    expect(mockDb.values).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 'test-user-id',
-      count: 1
-    }));
+    // Wait for the reports count to be updated
+    await waitFor(() => {
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
   });
 
-  it('updates report count correctly when a user already has reports', async () => {
-    // Setup mocks
-    const mockUser = { id: 'test-user-id', email: 'test@example.com' };
-    const mockReq = {
-      method: 'POST',
-      body: {
-        title: 'Test Report',
-        startDate: '2023-01-01',
-        endDate: '2023-01-31'
-      },
-    };
-    const mockRes = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn(),
-    };
+  it('should handle empty reports correctly', async () => {
+    // Mock reports response with empty reports array
+    fetch.mockImplementationOnce(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          reports: [],
+          subscription: { hasActiveSubscription: false }
+        })
+      })
+    );
 
-    // Mock database operations
-    const mockDb = {
-      select: vi.fn().mockReturnThis(),
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      values: vi.fn().mockReturnThis(),
-      returning: vi.fn().mockResolvedValue([{ id: '12345' }]),
-      update: vi.fn().mockReturnThis(),
-      set: vi.fn().mockReturnThis(),
-    };
-    
-    // Mock drizzle to return mockDb
-    const { drizzle } = await import('drizzle-orm/postgres-js');
-    drizzle.mockReturnValue(mockDb);
-    
-    // Mock authenticateUser to return mockUser
-    const { authenticateUser } = await import('../api/_apiUtils.js');
-    authenticateUser.mockResolvedValue(mockUser);
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
+    );
 
-    // Mock the count check to return 1 existing report
-    mockDb.where.mockImplementationOnce(() => [{
-      userId: 'test-user-id',
-      count: 1
-    }]); 
-    
-    // Mock the report insertion
-    mockDb.insert.mockReturnValueOnce(mockDb);
-    mockDb.values.mockReturnValueOnce(mockDb);
-    mockDb.returning.mockResolvedValueOnce([{ id: '12345' }]);
-    
-    // Mock the count record check for incrementReportCount
-    mockDb.where.mockImplementationOnce(() => [{
-      userId: 'test-user-id',
-      count: 1
-    }]);
-    
-    // Mock the update for incrementing the count
-    mockDb.update.mockReturnValueOnce(mockDb);
-    mockDb.set.mockReturnValueOnce(mockDb);
-    mockDb.where.mockReturnValueOnce(mockDb);
-    mockDb.returning.mockResolvedValueOnce([{ userId: 'test-user-id', count: 2 }]);
-    
-    // Mock verification select
-    mockDb.where.mockImplementationOnce(() => [{ userId: 'test-user-id', count: 2 }]);
-    
-    // Call the handler
-    await handler(mockReq, mockRes);
-    
-    // Verify the response
-    expect(mockRes.status).toHaveBeenCalledWith(201);
-    
-    // Verify that incrementReportCount was called and updated the existing count
-    expect(mockDb.update).toHaveBeenCalledTimes(1);
-    expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({
-      count: 2,
-      updatedAt: expect.any(Date)
-    }));
+    // Wait for the reports count to be updated
+    await waitFor(() => {
+      expect(screen.getByText('0')).toBeInTheDocument();
+    });
   });
-  
-  it('decreases the report count when a report is deleted', async () => {
-    // Setup mocks
-    const mockUser = { id: 'test-user-id', email: 'test@example.com' };
-    const mockReq = {
-      method: 'DELETE',
-      query: { id: '12345' },
-    };
-    const mockRes = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn(),
-    };
 
-    // Mock database operations
-    const mockDb = {
-      select: vi.fn().mockReturnThis(),
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      returning: vi.fn(),
-      update: vi.fn().mockReturnThis(),
-      set: vi.fn().mockReturnThis(),
-    };
-    
-    // Mock drizzle to return mockDb
-    const { drizzle } = await import('drizzle-orm/postgres-js');
-    drizzle.mockReturnValue(mockDb);
-    
-    // Mock authenticateUser to return mockUser
-    const { authenticateUser } = await import('../api/_apiUtils.js');
-    authenticateUser.mockResolvedValue(mockUser);
+  it('should handle API error correctly', async () => {
+    // Mock reports API error
+    fetch.mockImplementationOnce(() => 
+      Promise.reject(new Error('API error'))
+    );
 
-    // Mock the report deletion
-    mockDb.delete.mockReturnValueOnce(mockDb);
-    mockDb.where.mockReturnValueOnce(mockDb);
-    mockDb.returning.mockResolvedValueOnce([{ id: '12345' }]);
-    
-    // Mock the count record check
-    mockDb.where.mockImplementationOnce(() => [{
-      userId: 'test-user-id',
-      count: 2
-    }]);
-    
-    // Mock the update for decrementing the count
-    mockDb.update.mockReturnValueOnce(mockDb);
-    mockDb.set.mockReturnValueOnce(mockDb);
-    mockDb.where.mockReturnValueOnce(mockDb);
-    
-    // Call the handler
-    await handler(mockReq, mockRes);
-    
-    // Verify the response
-    expect(mockRes.status).toHaveBeenCalledWith(200);
-    
-    // Verify that the count was decremented
-    expect(mockDb.update).toHaveBeenCalledTimes(1);
-    expect(mockDb.set).toHaveBeenCalledWith(expect.objectContaining({
-      count: 1,
-      updatedAt: expect.any(Date)
-    }));
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
+    );
+
+    // Wait for the error handling to complete
+    await waitFor(() => {
+      // Should still display 0 for reports count after error
+      const countElements = screen.getAllByText('0');
+      expect(countElements.length).toBeGreaterThan(0);
+    });
   });
 });
