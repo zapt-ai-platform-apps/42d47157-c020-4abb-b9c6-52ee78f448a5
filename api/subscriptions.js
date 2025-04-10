@@ -107,8 +107,7 @@ export default async function handler(req, res) {
             userId: user.id,
           },
           subscription_data: {
-            application_fee_percent: 30,
-            transfer_data: { destination: 'acct_1RBjPHB1e4Ppxoh0' }
+            application_fee_percent: 30
           }
         }, {
           stripeAccount: 'acct_1RBjPHB1e4Ppxoh0'
