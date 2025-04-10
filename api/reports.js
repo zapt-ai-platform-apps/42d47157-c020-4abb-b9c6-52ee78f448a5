@@ -126,12 +126,38 @@ async function checkReportLimit(db, userId, userEmail) {
         .values({
           userId: userId,
           count: 0,
-          // FIX: Use Date object instead of string for timestamp field
           updatedAt: new Date()
-        })
-        .returning();
+        });
+      
+      // Fetch the newly created record to ensure we have accurate count
+      userReportCount = await db.select()
+        .from(userReportsCount)
+        .where(eq(userReportsCount.userId, userId));
+      
+      if (userReportCount.length > 0) {
+        reportsCreated = userReportCount[0].count;
+      }
     } else {
       reportsCreated = userReportCount[0].count;
+    }
+    
+    // Get the actual count of reports in the database as a fallback verification
+    const actualReportCount = await db.select({ count: reports.id })
+      .from(reports)
+      .where(eq(reports.userId, userId));
+    
+    // If there's a mismatch between the stored count and actual reports, update the count
+    if (actualReportCount.length !== reportsCreated) {
+      console.log(`Mismatch detected: stored count=${reportsCreated}, actual reports=${actualReportCount.length}`);
+      reportsCreated = actualReportCount.length;
+      
+      // Update the count to match reality
+      await db.update(userReportsCount)
+        .set({
+          count: actualReportCount.length,
+          updatedAt: new Date()
+        })
+        .where(eq(userReportsCount.userId, userId));
     }
     
     // Free users are limited to 2 reports
@@ -159,29 +185,56 @@ async function checkReportLimit(db, userId, userEmail) {
 
 // Update user's report count
 async function incrementReportCount(db, userId) {
-  // Check if user has a record in userReportsCount
-  let userReportCount = await db.select()
-    .from(userReportsCount)
-    .where(eq(userReportsCount.userId, userId));
-  
-  if (userReportCount.length === 0) {
-    // User doesn't have a record yet, create one
-    await db.insert(userReportsCount)
-      .values({
-        userId: userId,
-        count: 1,
-        // FIX: Use Date object instead of string for timestamp field
-        updatedAt: new Date()
-      });
-  } else {
-    // Increment the existing count
-    await db.update(userReportsCount)
-      .set({
-        count: userReportCount[0].count + 1,
-        // FIX: Use Date object instead of string for timestamp field
-        updatedAt: new Date()
-      })
+  try {
+    console.log(`Incrementing report count for user: ${userId}`);
+    
+    // Check if user has a record in userReportsCount
+    let userReportCount = await db.select()
+      .from(userReportsCount)
       .where(eq(userReportsCount.userId, userId));
+    
+    if (userReportCount.length === 0) {
+      // User doesn't have a record yet, create one
+      const inserted = await db.insert(userReportsCount)
+        .values({
+          userId: userId,
+          count: 1,
+          updatedAt: new Date()
+        })
+        .returning();
+      
+      console.log(`Created new report count record with count=1: ${JSON.stringify(inserted)}`);
+    } else {
+      // Get current count
+      const currentCount = userReportCount[0].count;
+      const newCount = currentCount + 1;
+      
+      // Increment the existing count
+      const updated = await db.update(userReportsCount)
+        .set({
+          count: newCount,
+          updatedAt: new Date()
+        })
+        .where(eq(userReportsCount.userId, userId))
+        .returning();
+      
+      console.log(`Updated report count from ${currentCount} to ${newCount}: ${JSON.stringify(updated)}`);
+    }
+    
+    // Verify the update was successful
+    const verifyCount = await db.select()
+      .from(userReportsCount)
+      .where(eq(userReportsCount.userId, userId));
+    
+    if (verifyCount.length > 0) {
+      console.log(`Verified report count is now: ${verifyCount[0].count}`);
+    } else {
+      console.error(`Failed to verify report count update for user: ${userId}`);
+    }
+  } catch (error) {
+    console.error(`Error incrementing report count for user ${userId}:`, error);
+    Sentry.captureException(error);
+    throw error; // Re-throw to ensure calling code knows there was an error
   }
 }
 
@@ -466,6 +519,33 @@ export default async function handler(req, res) {
         if (result.length === 0) {
           console.log(`No report found with ID ${reportId} for user ${user.id}`);
           return res.status(404).json({ error: 'Report not found or does not belong to user' });
+        }
+
+        // Update the report count after deleting a report
+        try {
+          // Get current count
+          const userReportCount = await db.select()
+            .from(userReportsCount)
+            .where(eq(userReportsCount.userId, user.id));
+          
+          if (userReportCount.length > 0) {
+            const currentCount = userReportCount[0].count;
+            const newCount = Math.max(0, currentCount - 1); // Ensure count never goes below 0
+            
+            // Update the count
+            await db.update(userReportsCount)
+              .set({
+                count: newCount,
+                updatedAt: new Date()
+              })
+              .where(eq(userReportsCount.userId, user.id));
+            
+            console.log(`Updated report count from ${currentCount} to ${newCount} after deletion`);
+          }
+        } catch (countError) {
+          console.error('Error updating report count after deletion:', countError);
+          Sentry.captureException(countError);
+          // Continue without failing the deletion
         }
 
         console.log(`Successfully deleted report with ID: ${reportId}`);
