@@ -52,20 +52,6 @@ export const reports = pgTable('reports', {
   pdfUrl: text('pdf_url'),
 });
 
-// Subscriptions table
-export const subscriptions = pgTable('subscriptions', {
-  id: serial('id').primaryKey(),
-  userId: text('user_id').notNull(),
-  status: text('status').notNull(),
-  plan: text('plan').notNull(),
-  currency: text('currency').notNull().default('GBP'),
-  currentPeriodStart: timestamp('current_period_start'),
-  currentPeriodEnd: timestamp('current_period_end'),
-  cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-
 // User reports count table
 export const userReportsCount = pgTable('user_reports_count', {
   userId: text('user_id').primaryKey(),
