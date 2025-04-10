@@ -70,6 +70,7 @@ export default async function handler(req, res) {
         metadata: {
           userId: user.id,
         },
+        application_fee_percent: 30, // Take 30% as application fee
       });
       
       // Create a pending subscription record in the database
