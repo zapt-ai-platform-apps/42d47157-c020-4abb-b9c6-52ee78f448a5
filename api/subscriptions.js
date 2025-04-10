@@ -103,12 +103,6 @@ export default async function handler(req, res) {
           client_reference_id: user.id,
           metadata: {
             userId: user.id,
-          },
-          subscription_data: {
-            application_fee_percent: 30, // Take 30% as application fee
-            transfer_data: { 
-              destination: 'acct_1Myei9AwvseTMg9w'
-            },
           }
         });
         
