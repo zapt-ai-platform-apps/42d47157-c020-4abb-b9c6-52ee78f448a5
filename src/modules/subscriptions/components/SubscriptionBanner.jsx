@@ -1,13 +1,78 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuthContext } from '@/modules/auth';
+import { supabase } from '@/supabaseClient';
+import * as Sentry from '@sentry/browser';
 
 export default function SubscriptionBanner({ canCreateReport, reportsCreated, limit, isVisible = true }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { user } = useAuthContext();
+
   if (!isVisible) {
     return null;
   }
   
+  const handleDirectUpgrade = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      setError('');
+      console.log('Creating Stripe checkout session from banner...');
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session found');
+      }
+      
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          currency: 'GBP', // Default to GBP
+          returnUrl: `${window.location.origin}/reports` // Return to reports page
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        throw new Error(errorData.error || `Failed to create subscription (Status: ${response.status})`);
+      }
+      
+      const checkoutSession = await response.json();
+      console.log('Received checkout session:', checkoutSession);
+
+      if (!checkoutSession.url) {
+        throw new Error('No checkout URL received from server');
+      }
+
+      // Redirect to Stripe checkout page
+      console.log('Redirecting to Stripe checkout:', checkoutSession.url);
+      window.location.href = checkoutSession.url;
+      
+    } catch (err) {
+      console.error('Error creating subscription:', err);
+      Sentry.captureException(err);
+      setError(err.message || 'Failed to create subscription. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   return (
     <div className="mb-6 rounded-lg overflow-hidden">
+      {error && (
+        <div className="bg-red-50 p-3 border border-red-100 mb-2 rounded-md">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+      
       {canCreateReport ? (
         <div className="bg-indigo-50 p-4 border border-indigo-100">
           <div className="flex">
@@ -21,9 +86,13 @@ export default function SubscriptionBanner({ canCreateReport, reportsCreated, li
                 Free plan: {reportsCreated} of {limit} reports used
               </p>
               <p className="mt-3 text-sm md:mt-0 md:ml-6">
-                <Link to="/pricing" className="whitespace-nowrap font-medium text-indigo-700 hover:text-indigo-600">
-                  Upgrade <span aria-hidden="true">&rarr;</span>
-                </Link>
+                <button
+                  onClick={handleDirectUpgrade}
+                  disabled={isLoading}
+                  className="whitespace-nowrap font-medium text-indigo-700 hover:text-indigo-600 cursor-pointer"
+                >
+                  {isLoading ? 'Processing...' : 'Upgrade'} <span aria-hidden="true">&rarr;</span>
+                </button>
               </p>
             </div>
           </div>
@@ -41,9 +110,23 @@ export default function SubscriptionBanner({ canCreateReport, reportsCreated, li
                 You've reached your free plan limit ({limit} reports). Upgrade to create more reports.
               </p>
               <p className="mt-3 text-sm md:mt-0 md:ml-6">
-                <Link to="/pricing" className="whitespace-nowrap font-medium text-yellow-700 hover:text-yellow-600">
-                  Upgrade Now <span aria-hidden="true">&rarr;</span>
-                </Link>
+                <button
+                  onClick={handleDirectUpgrade}
+                  disabled={isLoading}
+                  className="whitespace-nowrap font-medium text-yellow-700 hover:text-yellow-600 cursor-pointer"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    <>Upgrade Now <span aria-hidden="true">&rarr;</span></>
+                  )}
+                </button>
               </p>
             </div>
           </div>

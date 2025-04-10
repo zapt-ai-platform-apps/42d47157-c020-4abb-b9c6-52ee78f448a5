@@ -7,6 +7,7 @@ import { supabase } from '@/supabaseClient';
 export default function UpgradeModal({ isOpen, onClose }) {
   const [selectedCurrency, setSelectedCurrency] = useState('GBP');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const { user } = useAuthContext();
   const navigate = useNavigate();
 
@@ -20,9 +21,16 @@ export default function UpgradeModal({ isOpen, onClose }) {
   const handleSubscribe = async () => {
     try {
       setIsLoading(true);
+      setError('');
+      console.log('Creating Stripe checkout session from modal...');
       
       const { data: { session } } = await supabase.auth.getSession();
       
+      if (!session?.access_token) {
+        throw new Error('No active session found');
+      }
+      
+      console.log('Making request to /api/subscriptions endpoint');
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
@@ -36,20 +44,26 @@ export default function UpgradeModal({ isOpen, onClose }) {
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create subscription');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        throw new Error(errorData.error || `Failed to create subscription (Status: ${response.status})`);
       }
       
       const checkoutSession = await response.json();
+      console.log('Received checkout session:', checkoutSession);
+
+      if (!checkoutSession.url) {
+        throw new Error('No checkout URL received from server');
+      }
 
       // Redirect to Stripe checkout page
+      console.log('Redirecting to Stripe checkout:', checkoutSession.url);
       window.location.href = checkoutSession.url;
       
     } catch (error) {
       console.error('Error creating subscription:', error);
       Sentry.captureException(error);
-    } finally {
-      setIsLoading(false);
+      setError(error.message || 'Failed to create subscription. Please try again.');
+      setIsLoading(false); // Make sure loading state is reset even if we show an error
     }
   };
 
@@ -78,6 +92,12 @@ export default function UpgradeModal({ isOpen, onClose }) {
               </div>
             </div>
           </div>
+
+          {error && (
+            <div className="mt-3 p-3 bg-red-50 rounded-md">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
 
           <div className="mt-5 sm:mt-6">
             <div className="mb-4">
@@ -115,6 +135,7 @@ export default function UpgradeModal({ isOpen, onClose }) {
                 type="button"
                 onClick={onClose}
                 className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer"
+                disabled={isLoading}
               >
                 Cancel
               </button>
@@ -124,7 +145,15 @@ export default function UpgradeModal({ isOpen, onClose }) {
                 className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none cursor-pointer"
                 disabled={isLoading}
               >
-                {isLoading ? 'Processing...' : 'Upgrade Now'}
+                {isLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </span>
+                ) : 'Upgrade Now'}
               </button>
             </div>
           </div>

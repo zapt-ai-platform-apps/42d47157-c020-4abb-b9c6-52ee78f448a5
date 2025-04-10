@@ -7,6 +7,7 @@ import { supabase } from '@/supabaseClient';
 export default function PricingSection({ className = "", isPage = false }) {
   const [selectedCurrency, setSelectedCurrency] = useState('GBP');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const { user } = useAuthContext();
   const navigate = useNavigate();
 
@@ -17,15 +18,23 @@ export default function PricingSection({ className = "", isPage = false }) {
 
   const handleSubscribe = async () => {
     if (!user) {
+      console.log('User not logged in, redirecting to login page');
       navigate('/login');
       return;
     }
 
     try {
       setIsLoading(true);
+      setError('');
+      console.log('Creating Stripe checkout session...');
       
       const { data: { session } } = await supabase.auth.getSession();
       
+      if (!session?.access_token) {
+        throw new Error('No active session found');
+      }
+      
+      console.log('Making request to /api/subscriptions endpoint');
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
@@ -39,18 +48,25 @@ export default function PricingSection({ className = "", isPage = false }) {
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create subscription');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        throw new Error(errorData.error || `Failed to create subscription (Status: ${response.status})`);
       }
       
       const checkoutSession = await response.json();
+      console.log('Received checkout session:', checkoutSession);
+
+      if (!checkoutSession.url) {
+        throw new Error('No checkout URL received from server');
+      }
 
       // Redirect to Stripe checkout page
+      console.log('Redirecting to Stripe checkout:', checkoutSession.url);
       window.location.href = checkoutSession.url;
       
     } catch (error) {
       console.error('Error creating subscription:', error);
       Sentry.captureException(error);
+      setError(error.message || 'Failed to create subscription. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +85,12 @@ export default function PricingSection({ className = "", isPage = false }) {
             <p className="mt-5 text-xl text-gray-500 sm:text-center">
               Choose the plan that works best for your medication tracking needs
             </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
+            <p>{error}</p>
           </div>
         )}
 

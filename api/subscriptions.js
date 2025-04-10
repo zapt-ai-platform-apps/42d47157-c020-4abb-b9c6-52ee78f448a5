@@ -18,6 +18,13 @@ export default async function handler(req, res) {
 
   try {
     const user = await authenticateUser(req);
+    console.log(`Authenticated user: ${user.id}, email: ${user.email}`);
+    
+    // Initialize Stripe with API key
+    if (!process.env.STRIPE_API_KEY) {
+      throw new Error('Missing STRIPE_API_KEY environment variable');
+    }
+    
     const stripe = new Stripe(process.env.STRIPE_API_KEY);
     client = postgres(process.env.COCKROACH_DB_URL);
     const db = drizzle(client);
@@ -38,6 +45,7 @@ export default async function handler(req, res) {
       // If customer exists, get their subscriptions
       if (customers.data.length > 0) {
         const customer = customers.data[0];
+        console.log(`Found Stripe customer: ${customer.id}`);
         
         const subscriptions = await stripe.subscriptions.list({
           customer: customer.id,
@@ -48,7 +56,12 @@ export default async function handler(req, res) {
         if (subscriptions.data.length > 0) {
           hasActiveSubscription = true;
           subscription = subscriptions.data[0];
+          console.log(`Found active subscription: ${subscription.id}`);
+        } else {
+          console.log('No active subscriptions found');
         }
+      } else {
+        console.log('No Stripe customer found with this email');
       }
       
       return res.status(200).json({
@@ -65,32 +78,49 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid currency. Please choose GBP or USD.' });
       }
 
+      if (!PRICE_IDS[currency]) {
+        return res.status(400).json({ error: `Price ID not found for currency: ${currency}` });
+      }
+
       console.log(`Creating checkout session for user: ${user.id}, currency: ${currency}`);
       
-      // Initialize the Stripe client with the API key
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price: PRICE_IDS[currency],
-            quantity: 1,
+      try {
+        // Initialize the Stripe client with the API key
+        console.log('Creating Stripe checkout session...');
+        
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: PRICE_IDS[currency],
+              quantity: 1,
+            },
+          ],
+          mode: 'subscription',
+          success_url: `${returnUrl || 'https://sidetrack.zapt.ai/dashboard'}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${returnUrl?.split('?')[0] || 'https://sidetrack.zapt.ai/dashboard'}?canceled=true`,
+          customer_email: user.email,
+          client_reference_id: user.id,
+          metadata: {
+            userId: user.id,
           },
-        ],
-        mode: 'subscription',
-        success_url: `${returnUrl || 'https://sidetrack.zapt.ai/dashboard'}?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${returnUrl?.split('?')[0] || 'https://sidetrack.zapt.ai/dashboard'}?canceled=true`,
-        customer_email: user.email,
-        client_reference_id: user.id,
-        metadata: {
-          userId: user.id,
-        },
-        application_fee_percent: 30, // Take 30% as application fee
-      });
-      
-      return res.status(200).json({
-        id: session.id,
-        url: session.url
-      });
+          application_fee_percent: 30, // Take 30% as application fee
+        });
+        
+        console.log(`Created checkout session: ${session.id}, URL: ${session.url}`);
+        
+        return res.status(200).json({
+          id: session.id,
+          url: session.url
+        });
+      } catch (stripeError) {
+        console.error('Stripe error:', stripeError);
+        Sentry.captureException(stripeError);
+        return res.status(500).json({ 
+          error: 'Error creating Stripe checkout session', 
+          details: stripeError.message 
+        });
+      }
     }
 
     // If we get here, the method is not supported
@@ -98,7 +128,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error in subscriptions API:', error);
     Sentry.captureException(error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', message: error.message });
   } finally {
     if (client) {
       await client.end();

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
+import * as Sentry from '@sentry/browser';
+import { supabase } from '@/supabaseClient';
 
 export default function Layout({ children }) {
   const { user, signOut } = useAuthContext();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
   
   const handleSignOut = async () => {
     try {
@@ -24,6 +27,61 @@ export default function Layout({ children }) {
     isActive 
       ? "text-indigo-600 font-medium" 
       : "text-gray-600 hover:text-gray-900";
+  
+  const handleDirectUpgrade = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    try {
+      setIsUpgradeLoading(true);
+      console.log('Creating Stripe checkout session from navigation...');
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No active session found');
+      }
+      
+      const response = await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({
+          currency: 'GBP', // Default to GBP
+          returnUrl: `${window.location.origin}/dashboard` // Return to dashboard after checkout
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        throw new Error(errorData.error || `Failed to create subscription (Status: ${response.status})`);
+      }
+      
+      const checkoutSession = await response.json();
+      console.log('Received checkout session:', checkoutSession);
+
+      if (!checkoutSession.url) {
+        throw new Error('No checkout URL received from server');
+      }
+
+      // Redirect to Stripe checkout page
+      console.log('Redirecting to Stripe checkout:', checkoutSession.url);
+      window.location.href = checkoutSession.url;
+      
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      Sentry.captureException(error);
+      // If there's an error, navigate to the pricing page as fallback
+      navigate('/pricing');
+    } finally {
+      setIsUpgradeLoading(false);
+    }
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -50,7 +108,13 @@ export default function Layout({ children }) {
                   <NavLink to="/side-effects" className={navLinkClass}>Side Effects</NavLink>
                   <NavLink to="/daily-checkins" className={navLinkClass}>Daily Check-ins</NavLink>
                   <NavLink to="/reports" className={navLinkClass}>Reports</NavLink>
-                  <NavLink to="/pricing" className={navLinkClass}>Pricing</NavLink>
+                  <button
+                    onClick={handleDirectUpgrade}
+                    disabled={isUpgradeLoading}
+                    className={`${navLinkClass({ isActive: false })} cursor-pointer`}
+                  >
+                    {isUpgradeLoading ? 'Processing...' : 'Upgrade'}
+                  </button>
                   <button 
                     onClick={handleSignOut}
                     className="text-gray-600 hover:text-gray-900 cursor-pointer"
@@ -140,17 +204,16 @@ export default function Layout({ children }) {
             >
               Reports
             </NavLink>
-            <NavLink 
-              to="/pricing" 
-              className={({ isActive }) => 
-                `block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`
-              }
-              onClick={closeMobileMenu}
+            <button 
+              onClick={(e) => {
+                closeMobileMenu();
+                handleDirectUpgrade(e);
+              }}
+              disabled={isUpgradeLoading}
+              className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 cursor-pointer"
             >
-              Pricing
-            </NavLink>
+              {isUpgradeLoading ? 'Processing...' : 'Upgrade'}
+            </button>
             <button 
               onClick={() => {
                 handleSignOut();
