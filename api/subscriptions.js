@@ -6,10 +6,8 @@ import Sentry from './_sentry.js';
 import { eq } from 'drizzle-orm';
 import Stripe from 'stripe';
 
-const PRICE_IDS = {
-  GBP: 'price_1RCJSQB1e4Ppxoh03bw4Z9HF',
-  USD: 'price_1RCJSQB1e4Ppxoh03bw4Z9HF' // In actual use, this would be a different price ID
-};
+// Single price ID that supports multiple currencies
+const PRICE_ID = 'price_1RCJSQB1e4Ppxoh03bw4Z9HF';
 
 export default async function handler(req, res) {
   console.log(`Processing ${req.method} request to /api/subscriptions`);
@@ -78,14 +76,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid currency. Please choose GBP or USD.' });
       }
 
-      if (!PRICE_IDS[currency]) {
-        return res.status(400).json({ error: `Price ID not found for currency: ${currency}` });
-      }
-
       console.log(`Creating checkout session for user: ${user.id}, currency: ${currency}`);
       
       try {
-        // Initialize the Stripe client with the API key
+        // Check for required environment variable
+        if (!process.env.STRIPE_API_KEY_CHECKOUTS) {
+          throw new Error('Missing STRIPE_API_KEY_CHECKOUTS environment variable');
+        }
+        
         console.log('Creating Stripe checkout session...');
 
         const stripeCheckout = new Stripe(process.env.STRIPE_API_KEY_CHECKOUTS);
@@ -94,10 +92,11 @@ export default async function handler(req, res) {
           payment_method_types: ['card'],
           line_items: [
             {
-              price: PRICE_IDS[currency],
+              price: PRICE_ID,
               quantity: 1,
             },
           ],
+          currency: currency.toLowerCase(), // Specify the currency for the session
           mode: 'subscription',
           success_url: `${returnUrl || 'https://sidetrack.zapt.ai/dashboard'}?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${returnUrl?.split('?')[0] || 'https://sidetrack.zapt.ai/dashboard'}?canceled=true`,
