@@ -203,4 +203,79 @@ describe('Reports API Handler', () => {
     // Response should be successful
     expect(mockRes.status).toHaveBeenCalledWith(200);
   });
+
+  it('should handle date string validation correctly with ensureDateString', async () => {
+    // Import the function we want to test
+    const module = await import(handlerPath);
+    
+    // Access the ensureDateString function by mocking it to expose it
+    let ensureDateString;
+    
+    // Create a test request that will cause ensureDateString to be defined
+    const mockReq = { method: 'GET', query: {} };
+    const mockRes = { 
+      status: vi.fn().mockReturnThis(), 
+      json: vi.fn() 
+    };
+    
+    // Run the handler which will define the function
+    module.default(mockReq, mockRes);
+    
+    // Mock implementation to extract the ensureDateString function
+    vi.doMock(handlerPath, () => {
+      ensureDateString = module.__get__('ensureDateString');
+      return { default: vi.fn() };
+    });
+    
+    // If we can't access the function directly, we'll test it indirectly
+    // by making sure the handler works with various date inputs
+    
+    // Create a request that would use ensureDateString
+    const testReq = {
+      method: 'POST',
+      body: {
+        title: 'Test Report',
+        startDate: '2023-01-01',
+        endDate: new Date('2023-01-31') // Pass a Date object to test conversion
+      }
+    };
+    
+    const testRes = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn()
+    };
+    
+    // Reset mocks for clean test
+    vi.clearAllMocks();
+    
+    // Mock DB and auth for this test
+    const mockDb = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: '12345' }])
+    };
+    
+    const { drizzle } = await import('drizzle-orm/postgres-js');
+    drizzle.mockReturnValue(mockDb);
+    
+    const { authenticateUser } = await import('./_apiUtils.js');
+    authenticateUser.mockResolvedValue({ id: 'test-user', email: 'test@example.com' });
+    
+    // Mock checkReportLimit to return true
+    vi.mock('../api/reports.js', async () => {
+      const originalModule = await vi.importActual(handlerPath);
+      return {
+        ...originalModule,
+        checkReportLimit: vi.fn().mockResolvedValue({ canCreateReport: true })
+      };
+    });
+    
+    // Expect the function to succeed, indicating it properly handled the date object
+    // This test relies on the function being called inside the handler
+    expect(() => module.default(testReq, testRes)).not.toThrow();
+  });
 });

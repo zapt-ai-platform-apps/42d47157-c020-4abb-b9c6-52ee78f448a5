@@ -41,6 +41,42 @@ function convertBigIntToString(data) {
   return data;
 }
 
+/**
+ * Ensures value is either a valid date string or a Date object
+ * Prevents toISOString errors by handling non-Date objects
+ * @param {any} dateValue - Value to validate as a date
+ * @returns {string|null} A date string in YYYY-MM-DD format or null
+ */
+function ensureDateString(dateValue) {
+  if (!dateValue) return null;
+  
+  // If it's already a date string in YYYY-MM-DD format, return it as is
+  if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateValue;
+  }
+  
+  // Handle Date objects or convert to Date
+  try {
+    let date;
+    if (dateValue instanceof Date) {
+      date = dateValue;
+    } else {
+      date = new Date(dateValue);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date value: ${dateValue}`);
+        throw new Error(`Invalid date value: ${dateValue}`);
+      }
+    }
+    return date.toISOString().split('T')[0];
+  } catch (error) {
+    console.error(`Error formatting date value: ${dateValue}`, error);
+    Sentry.captureException(error);
+    // Return null for invalid dates instead of letting it propagate as something that's not a Date
+    return null;
+  }
+}
+
 // Check if user has reached free report limit and has no active subscription
 async function checkReportLimit(db, userId, userEmail) {
   try {
@@ -226,9 +262,17 @@ export default async function handler(req, res) {
         }
 
         const report = reportDetails[0];
-        const { startDate, endDate } = report;
         
-        console.log(`Fetching medications for user ${user.id} for report period ${startDate} to ${endDate}`);
+        // Ensure date values are properly formatted strings before using them
+        const startDateFormatted = ensureDateString(report.startDate);
+        const endDateFormatted = ensureDateString(report.endDate);
+        
+        if (!startDateFormatted || !endDateFormatted) {
+          console.error(`Invalid date values in report: startDate=${report.startDate}, endDate=${report.endDate}`);
+          return res.status(500).json({ error: 'Invalid date values in report' });
+        }
+        
+        console.log(`Fetching medications for user ${user.id} for report period ${startDateFormatted} to ${endDateFormatted}`);
 
         // First fetch ALL medications for this user to ensure we don't miss any
         const allMedicationsList = await db.select()
@@ -240,67 +284,88 @@ export default async function handler(req, res) {
         
         // Then filter them to find those active during the report period
         const medicationsList = allMedicationsList.filter(med => {
-          const medicationStart = new Date(med.startDate);
-          const medicationEnd = med.endDate ? new Date(med.endDate) : null;
-          const reportStart = new Date(startDate);
-          const reportEnd = new Date(endDate);
-          
-          // Medication started before or during the report period
-          const startedBeforeOrDuringReport = medicationStart <= reportEnd;
-          
-          // Medication ended after the report started or is still active
-          const endedAfterReportStartedOrStillActive = !medicationEnd || medicationEnd >= reportStart;
-          
-          const isActive = startedBeforeOrDuringReport && endedAfterReportStartedOrStillActive;
-          
-          if (isActive) {
-            console.log(`Including medication: ${med.name} (${med.startDate} to ${med.endDate || 'ongoing'})`);
+          try {
+            // Ensure all date values are valid before comparison
+            const medicationStartStr = ensureDateString(med.startDate);
+            const medicationEndStr = med.endDate ? ensureDateString(med.endDate) : null;
+            
+            if (!medicationStartStr) {
+              console.warn(`Skipping medication ${med.id} due to invalid start date: ${med.startDate}`);
+              return false;
+            }
+            
+            const medicationStart = new Date(medicationStartStr);
+            const medicationEnd = medicationEndStr ? new Date(medicationEndStr) : null;
+            const reportStart = new Date(startDateFormatted);
+            const reportEnd = new Date(endDateFormatted);
+            
+            // Medication started before or during the report period
+            const startedBeforeOrDuringReport = medicationStart <= reportEnd;
+            
+            // Medication ended after the report started or is still active
+            const endedAfterReportStartedOrStillActive = !medicationEnd || medicationEnd >= reportStart;
+            
+            const isActive = startedBeforeOrDuringReport && endedAfterReportStartedOrStillActive;
+            
+            if (isActive) {
+              console.log(`Including medication: ${med.name} (${medicationStartStr} to ${medicationEndStr || 'ongoing'})`);
+            }
+            
+            return isActive;
+          } catch (error) {
+            console.error(`Error processing medication ${med.id}:`, error);
+            Sentry.captureException(error);
+            return false;
           }
-          
-          return isActive;
         });
         
         console.log(`After filtering, found ${medicationsList.length} medications active during report period`);
 
-        // Get side effects during the report period
-        const sideEffectsList = await db.select({
-          sideEffect: sideEffects,
-          medicationName: medications.name
-        })
-          .from(sideEffects)
-          .leftJoin(medications, eq(sideEffects.medicationId, medications.id))
-          .where(and(
-            eq(sideEffects.userId, user.id),
-            between(sideEffects.date, startDate, endDate)
-          ))
-          .orderBy(sideEffects.date, sideEffects.createdAt);
+        try {
+          // Get side effects during the report period
+          const sideEffectsList = await db.select({
+            sideEffect: sideEffects,
+            medicationName: medications.name
+          })
+            .from(sideEffects)
+            .leftJoin(medications, eq(sideEffects.medicationId, medications.id))
+            .where(and(
+              eq(sideEffects.userId, user.id),
+              between(sideEffects.date, startDateFormatted, endDateFormatted)
+            ))
+            .orderBy(sideEffects.date, sideEffects.createdAt);
 
-        // Get daily check-ins during the report period
-        const checkinsList = await db.select()
-          .from(dailyCheckins)
-          .where(and(
-            eq(dailyCheckins.userId, user.id),
-            between(dailyCheckins.date, startDate, endDate)
-          ))
-          .orderBy(dailyCheckins.date);
+          // Get daily check-ins during the report period
+          const checkinsList = await db.select()
+            .from(dailyCheckins)
+            .where(and(
+              eq(dailyCheckins.userId, user.id),
+              between(dailyCheckins.date, startDateFormatted, endDateFormatted)
+            ))
+            .orderBy(dailyCheckins.date);
 
-        // Format side effects
-        const formattedSideEffects = sideEffectsList.map(row => ({
-          ...row.sideEffect,
-          medicationName: row.medicationName
-        }));
+          // Format side effects
+          const formattedSideEffects = sideEffectsList.map(row => ({
+            ...row.sideEffect,
+            medicationName: row.medicationName
+          }));
 
-        console.log(`Successfully assembled report data. Medications: ${medicationsList.length}, Side Effects: ${formattedSideEffects.length}, Check-ins: ${checkinsList.length}`);
-        
-        // Convert any BigInt values to strings before returning the JSON response
-        const responseData = {
-          report,
-          medications: medicationsList,
-          sideEffects: formattedSideEffects,
-          checkins: checkinsList
-        };
-        
-        return res.status(200).json(convertBigIntToString(responseData));
+          console.log(`Successfully assembled report data. Medications: ${medicationsList.length}, Side Effects: ${formattedSideEffects.length}, Check-ins: ${checkinsList.length}`);
+          
+          // Convert any BigInt values to strings before returning the JSON response
+          const responseData = {
+            report,
+            medications: medicationsList,
+            sideEffects: formattedSideEffects,
+            checkins: checkinsList
+          };
+          
+          return res.status(200).json(convertBigIntToString(responseData));
+        } catch (error) {
+          console.error('Error fetching report data:', error);
+          Sentry.captureException(error);
+          return res.status(500).json({ error: `Failed to fetch report data: ${error.message}` });
+        }
       }
       
       // Otherwise return the list of reports
@@ -341,12 +406,20 @@ export default async function handler(req, res) {
       }
 
       try {
+        // Format dates as strings consistently
+        const formattedStartDate = ensureDateString(startDate);
+        const formattedEndDate = ensureDateString(endDate);
+        
+        if (!formattedStartDate || !formattedEndDate) {
+          return res.status(400).json({ error: 'Invalid date format provided' });
+        }
+        
         const result = await db.insert(reports)
           .values({
             userId: user.id,
             title,
-            startDate: formatDateForDB(startDate),
-            endDate: formatDateForDB(endDate),
+            startDate: formattedStartDate,
+            endDate: formattedEndDate,
           })
           .returning();
 
