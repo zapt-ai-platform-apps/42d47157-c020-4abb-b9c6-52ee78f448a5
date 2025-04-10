@@ -111,8 +111,9 @@ export default async function handler(req, res) {
             transfer_data: { destination: 'acct_1RBjPHB1e4Ppxoh0' },
             on_behalf_of: 'acct_1RBjPHB1e4Ppxoh0',
           }
-        }
-        );
+        }, {
+          stripeAccount: 'acct_1RBjPHB1e4Ppxoh0'
+        });
         
         console.log(`Created checkout session: ${session.id}, URL: ${session.url}`);
         
