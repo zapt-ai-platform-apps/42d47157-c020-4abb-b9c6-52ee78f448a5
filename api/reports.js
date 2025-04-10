@@ -1,10 +1,11 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { medications, sideEffects, dailyCheckins, reports, subscriptions, userReportsCount } from '../drizzle/schema.js';
+import { medications, sideEffects, dailyCheckins, reports, userReportsCount } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq, and, between, desc, or, isNull } from 'drizzle-orm';
 import { formatDateForDB } from './_dateUtils.js';
+import Stripe from 'stripe';
 
 /**
  * Recursively converts any BigInt values to strings in an object
@@ -41,54 +42,82 @@ function convertBigIntToString(data) {
 }
 
 // Check if user has reached free report limit and has no active subscription
-async function checkReportLimit(db, userId) {
-  // Check if user has an active subscription
-  const userSubscriptions = await db.select()
-    .from(subscriptions)
-    .where(and(
-      eq(subscriptions.userId, userId),
-      or(
-        eq(subscriptions.status, 'active'),
-        eq(subscriptions.status, 'trialing')
-      )
-    ));
+async function checkReportLimit(db, userId, userEmail) {
+  try {
+    if (!userEmail) {
+      throw new Error('User email not available');
+    }
+    
+    // Initialize Stripe
+    const stripe = new Stripe(process.env.STRIPE_API_KEY);
+    
+    // Search for a customer in Stripe by email
+    const customers = await stripe.customers.list({
+      email: userEmail,
+      limit: 1
+    });
+    
+    let hasActiveSubscription = false;
+    
+    // If customer exists, check for active subscriptions
+    if (customers.data.length > 0) {
+      const customer = customers.data[0];
+      
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: 'active',
+        limit: 1
+      });
+      
+      hasActiveSubscription = subscriptions.data.length > 0;
+    }
+    
+    // If user has an active subscription, they can create unlimited reports
+    if (hasActiveSubscription) {
+      return { canCreateReport: true, hasActiveSubscription, reportsCreated: 0 };
+    }
   
-  const hasActiveSubscription = userSubscriptions.length > 0;
-  
-  // If user has an active subscription, they can create unlimited reports
-  if (hasActiveSubscription) {
-    return { canCreateReport: true, hasActiveSubscription, reportsCreated: 0 };
+    // Check how many reports the user has created
+    let userReportCount = await db.select()
+      .from(userReportsCount)
+      .where(eq(userReportsCount.userId, userId));
+    
+    let reportsCreated = 0;
+    
+    if (userReportCount.length === 0) {
+      // User hasn't created any reports yet, create a record
+      await db.insert(userReportsCount)
+        .values({
+          userId: userId,
+          count: 0,
+          updatedAt: new Date().toISOString()
+        })
+        .returning();
+    } else {
+      reportsCreated = userReportCount[0].count;
+    }
+    
+    // Free users are limited to 2 reports
+    const FREE_REPORT_LIMIT = 2;
+    
+    return {
+      canCreateReport: reportsCreated < FREE_REPORT_LIMIT,
+      hasActiveSubscription,
+      reportsCreated,
+      limit: FREE_REPORT_LIMIT
+    };
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
+    Sentry.captureException(error);
+    // Default to no active subscription in case of error
+    return {
+      canCreateReport: false,
+      hasActiveSubscription: false,
+      reportsCreated: 0,
+      limit: 2,
+      error: error.message
+    };
   }
-  
-  // Check how many reports the user has created
-  let userReportCount = await db.select()
-    .from(userReportsCount)
-    .where(eq(userReportsCount.userId, userId));
-  
-  let reportsCreated = 0;
-  
-  if (userReportCount.length === 0) {
-    // User hasn't created any reports yet, create a record
-    await db.insert(userReportsCount)
-      .values({
-        userId: userId,
-        count: 0,
-        updatedAt: new Date().toISOString()
-      })
-      .returning();
-  } else {
-    reportsCreated = userReportCount[0].count;
-  }
-  
-  // Free users are limited to 2 reports
-  const FREE_REPORT_LIMIT = 2;
-  
-  return {
-    canCreateReport: reportsCreated < FREE_REPORT_LIMIT,
-    hasActiveSubscription,
-    reportsCreated,
-    limit: FREE_REPORT_LIMIT
-  };
 }
 
 // Update user's report count
@@ -282,7 +311,7 @@ export default async function handler(req, res) {
         .orderBy(desc(reports.createdAt));
       
       // Check subscription status and report limit
-      const subscriptionStatus = await checkReportLimit(db, user.id);
+      const subscriptionStatus = await checkReportLimit(db, user.id, user.email);
       
       console.log(`Found ${result.length} reports`);
       // Convert any BigInt values to strings
@@ -302,7 +331,7 @@ export default async function handler(req, res) {
       }
 
       // Check if user has reached the report limit
-      const limitStatus = await checkReportLimit(db, user.id);
+      const limitStatus = await checkReportLimit(db, user.id, user.email);
       
       if (!limitStatus.canCreateReport) {
         return res.status(403).json({

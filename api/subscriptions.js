@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { subscriptions } from '../drizzle/schema.js';
+import { userReportsCount } from '../drizzle/schema.js';
 import { authenticateUser } from './_apiUtils.js';
 import Sentry from './_sentry.js';
 import { eq } from 'drizzle-orm';
@@ -18,25 +18,42 @@ export default async function handler(req, res) {
 
   try {
     const user = await authenticateUser(req);
+    const stripe = new Stripe(process.env.STRIPE_API_KEY);
     client = postgres(process.env.COCKROACH_DB_URL);
     const db = drizzle(client);
 
-    // GET request - retrieve user's subscription status
+    // GET request - retrieve user's subscription status directly from Stripe
     if (req.method === 'GET') {
-      console.log(`Fetching subscription status for user: ${user.id}`);
+      console.log(`Fetching subscription status for user: ${user.id}, email: ${user.email}`);
       
-      const result = await db.select()
-        .from(subscriptions)
-        .where(eq(subscriptions.userId, user.id))
-        .orderBy(subscriptions.createdAt);
-
-      const activeSubscription = result.find(sub => 
-        sub.status === 'active' || sub.status === 'trialing'
-      );
+      // Search for a customer in Stripe by email
+      const customers = await stripe.customers.list({
+        email: user.email,
+        limit: 1
+      });
+      
+      let hasActiveSubscription = false;
+      let subscription = null;
+      
+      // If customer exists, get their subscriptions
+      if (customers.data.length > 0) {
+        const customer = customers.data[0];
+        
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customer.id,
+          status: 'active',
+          limit: 1
+        });
+        
+        if (subscriptions.data.length > 0) {
+          hasActiveSubscription = true;
+          subscription = subscriptions.data[0];
+        }
+      }
       
       return res.status(200).json({
-        hasActiveSubscription: !!activeSubscription,
-        subscription: activeSubscription || null
+        hasActiveSubscription,
+        subscription
       });
     }
     
@@ -51,9 +68,6 @@ export default async function handler(req, res) {
       console.log(`Creating checkout session for user: ${user.id}, currency: ${currency}`);
       
       // Initialize the Stripe client with the API key
-      const stripe = new Stripe(process.env.STRIPE_API_KEY);
-      
-      // Create the checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -73,48 +87,10 @@ export default async function handler(req, res) {
         application_fee_percent: 30, // Take 30% as application fee
       });
       
-      // Create a pending subscription record in the database
-      const result = await db.insert(subscriptions)
-        .values({
-          userId: user.id,
-          status: 'incomplete',  // Will be updated by webhook
-          plan: 'standard',
-          currency: currency,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
-        .returning();
-
-      console.log(`Created subscription record with ID: ${result[0].id}`);
       return res.status(200).json({
         id: session.id,
         url: session.url
       });
-    }
-
-    // PATCH request - update subscription status (this would be called by a webhook)
-    if (req.method === 'PATCH') {
-      const { subscriptionId, status } = req.body;
-      
-      if (!subscriptionId || !status) {
-        return res.status(400).json({ error: 'Missing subscriptionId or status' });
-      }
-
-      console.log(`Updating subscription status: ${subscriptionId} to ${status}`);
-      
-      const result = await db.update(subscriptions)
-        .set({
-          status: status,
-          updatedAt: new Date().toISOString()
-        })
-        .where(eq(subscriptions.id, subscriptionId))
-        .returning();
-
-      if (result.length === 0) {
-        return res.status(404).json({ error: 'Subscription not found' });
-      }
-
-      return res.status(200).json(result[0]);
     }
 
     // If we get here, the method is not supported
