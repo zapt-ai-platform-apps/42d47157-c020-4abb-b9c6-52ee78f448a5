@@ -3,12 +3,14 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
+import { CurrencyModal } from '@/modules/subscriptions';
 
 export default function Layout({ children }) {
   const { user, signOut } = useAuthContext();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   
   const handleSignOut = async () => {
     try {
@@ -28,16 +30,23 @@ export default function Layout({ children }) {
       ? "text-indigo-600 font-medium" 
       : "text-gray-600 hover:text-gray-900";
   
-  const handleDirectUpgrade = async (e) => {
+  const handleDirectUpgrade = (e) => {
     e.preventDefault();
     if (!user) {
       navigate('/login');
       return;
     }
     
+    // Open currency selection modal
+    setIsCurrencyModalOpen(true);
+  };
+  
+  const handleCurrencyConfirm = async (selectedCurrency) => {
+    setIsCurrencyModalOpen(false);
+    
     try {
       setIsUpgradeLoading(true);
-      console.log('Creating Stripe checkout session from navigation...');
+      console.log('Creating Stripe checkout session from navigation with currency:', selectedCurrency);
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -52,7 +61,7 @@ export default function Layout({ children }) {
           Authorization: `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          currency: 'GBP', // Default to GBP
+          currency: selectedCurrency,
           returnUrl: `${window.location.origin}/dashboard` // Return to dashboard after checkout
         })
       });
@@ -248,6 +257,13 @@ export default function Layout({ children }) {
           </div>
         </div>
       </footer>
+      
+      {/* Currency selection modal */}
+      <CurrencyModal 
+        isOpen={isCurrencyModalOpen}
+        onClose={() => setIsCurrencyModalOpen(false)}
+        onConfirm={handleCurrencyConfirm}
+      />
     </div>
   );
 }

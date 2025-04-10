@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
+import { CurrencySelector } from '@/modules/subscriptions';
 
 export default function UpgradeModal({ isOpen, onClose }) {
   const [selectedCurrency, setSelectedCurrency] = useState('GBP');
@@ -22,7 +23,7 @@ export default function UpgradeModal({ isOpen, onClose }) {
     try {
       setIsLoading(true);
       setError('');
-      console.log('Creating Stripe checkout session from modal...');
+      console.log('Creating Stripe checkout session from modal with currency:', selectedCurrency);
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -102,26 +103,10 @@ export default function UpgradeModal({ isOpen, onClose }) {
           <div className="mt-5 sm:mt-6">
             <div className="mb-4">
               <div className="flex justify-center space-x-4">
-                <button
-                  onClick={() => setSelectedCurrency('GBP')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md ${
-                    selectedCurrency === 'GBP'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-white text-gray-700 border border-gray-300'
-                  } cursor-pointer`}
-                >
-                  GBP (£)
-                </button>
-                <button
-                  onClick={() => setSelectedCurrency('USD')}
-                  className={`px-4 py-2 text-sm font-medium rounded-md ${
-                    selectedCurrency === 'USD'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-white text-gray-700 border border-gray-300'
-                  } cursor-pointer`}
-                >
-                  USD ($)
-                </button>
+                <CurrencySelector
+                  selectedCurrency={selectedCurrency}
+                  onCurrencyChange={setSelectedCurrency}
+                />
               </div>
             </div>
 

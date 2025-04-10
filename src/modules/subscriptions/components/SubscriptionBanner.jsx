@@ -3,24 +3,33 @@ import { Link } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
 import { supabase } from '@/supabaseClient';
 import * as Sentry from '@sentry/browser';
+import { CurrencyModal } from '@/modules/subscriptions';
 
 export default function SubscriptionBanner({ canCreateReport, reportsCreated, limit, isVisible = true }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const { user } = useAuthContext();
 
   if (!isVisible) {
     return null;
   }
   
-  const handleDirectUpgrade = async (e) => {
+  const handleDirectUpgrade = (e) => {
     e.preventDefault();
     if (!user) return;
+    
+    // Open currency selection modal
+    setIsCurrencyModalOpen(true);
+  };
+  
+  const handleCurrencyConfirm = async (selectedCurrency) => {
+    setIsCurrencyModalOpen(false);
     
     try {
       setIsLoading(true);
       setError('');
-      console.log('Creating Stripe checkout session from banner...');
+      console.log('Creating Stripe checkout session from banner with currency:', selectedCurrency);
       
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -35,7 +44,7 @@ export default function SubscriptionBanner({ canCreateReport, reportsCreated, li
           Authorization: `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
-          currency: 'GBP', // Default to GBP
+          currency: selectedCurrency,
           returnUrl: `${window.location.origin}/reports` // Return to reports page
         })
       });
@@ -132,6 +141,13 @@ export default function SubscriptionBanner({ canCreateReport, reportsCreated, li
           </div>
         </div>
       )}
+      
+      {/* Currency selection modal */}
+      <CurrencyModal 
+        isOpen={isCurrencyModalOpen}
+        onClose={() => setIsCurrencyModalOpen(false)}
+        onConfirm={handleCurrencyConfirm}
+      />
     </div>
   );
 }

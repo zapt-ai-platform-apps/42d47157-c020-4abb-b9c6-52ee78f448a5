@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/modules/auth';
 import * as Sentry from '@sentry/browser';
 import { supabase } from '@/supabaseClient';
+import { CurrencySelector } from '@/modules/subscriptions';
 
 export default function PricingSection({ className = "", isPage = false }) {
   const [selectedCurrency, setSelectedCurrency] = useState('GBP');
@@ -34,7 +35,7 @@ export default function PricingSection({ className = "", isPage = false }) {
         throw new Error('No active session found');
       }
       
-      console.log('Making request to /api/subscriptions endpoint');
+      console.log('Making request to /api/subscriptions endpoint with currency:', selectedCurrency);
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
         headers: {
@@ -70,10 +71,6 @@ export default function PricingSection({ className = "", isPage = false }) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleCurrencyChange = (currency) => {
-    setSelectedCurrency(currency);
   };
 
   return (
@@ -159,27 +156,11 @@ export default function PricingSection({ className = "", isPage = false }) {
               </p>
               
               {/* Currency toggle */}
-              <div className="mt-4 flex items-center justify-start space-x-3">
-                <button 
-                  onClick={() => handleCurrencyChange('GBP')}
-                  className={`px-3 py-1 text-sm rounded-md ${
-                    selectedCurrency === 'GBP' 
-                      ? 'bg-indigo-600 text-white font-medium' 
-                      : 'bg-white text-gray-700 border border-gray-300'
-                  } cursor-pointer`}
-                >
-                  GBP (£)
-                </button>
-                <button 
-                  onClick={() => handleCurrencyChange('USD')}
-                  className={`px-3 py-1 text-sm rounded-md ${
-                    selectedCurrency === 'USD' 
-                      ? 'bg-indigo-600 text-white font-medium' 
-                      : 'bg-white text-gray-700 border border-gray-300'
-                  } cursor-pointer`}
-                >
-                  USD ($)
-                </button>
+              <div className="mt-4">
+                <CurrencySelector
+                  selectedCurrency={selectedCurrency}
+                  onCurrencyChange={setSelectedCurrency}
+                />
               </div>
               
               <p className="mt-8">
