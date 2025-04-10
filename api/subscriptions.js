@@ -104,7 +104,9 @@ export default async function handler(req, res) {
           metadata: {
             userId: user.id,
           },
-          application_fee_percent: 30, // Take 30% as application fee
+          subscription_data: {
+            application_fee_percent: 30, // Take 30% as application fee
+          }
         });
         
         console.log(`Created checkout session: ${session.id}, URL: ${session.url}`);
