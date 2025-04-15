@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     
     // Validate response contains required fields
     if (!supportResponse || !supportResponse.token || !supportResponse.channelId || 
-        !supportResponse.userId || !supportResponse.STREAM_KEY) {
+        !supportResponse.userId || !supportResponse.STREAM_API_KEY) {
       console.error('Incomplete support response:', {
         ...supportResponse,
         token: supportResponse?.token ? '[REDACTED]' : undefined
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       channelId: supportResponse.channelId,
       userId: supportResponse.userId,
       hasToken: !!supportResponse.token,
-      hasStreamKey: !!supportResponse.STREAM_KEY
+      hasStreamKey: !!supportResponse.STREAM_API_KEY
     });
     
     return res.status(200).json(supportResponse);
