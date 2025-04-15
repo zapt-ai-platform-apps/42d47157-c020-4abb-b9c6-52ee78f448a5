@@ -7,6 +7,7 @@ import {
   PublicRoute,
 } from './modules/auth';
 import Layout from './app/components/Layout';
+import { ChatWidget } from './modules/support';
 import {
   DashboardPage,
   LoginPage,
@@ -153,6 +154,9 @@ export default function App() {
           <Navigate to="/" replace />
         } />
       </Routes>
+      
+      {/* Chat Widget - displayed on all pages when user is logged in */}
+      <ChatWidget />
     </AuthProvider>
   );
 }

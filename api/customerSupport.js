@@ -1,0 +1,74 @@
+import { initializeZapt } from '@zapt/zapt-js';
+import * as Sentry from '@sentry/node';
+import { authenticateUser } from './_apiUtils.js';
+
+// Initialize Sentry
+Sentry.init({
+  dsn: process.env.VITE_PUBLIC_SENTRY_DSN,
+  environment: process.env.VITE_PUBLIC_APP_ENV,
+  initialScope: {
+    tags: {
+      type: 'backend',
+      projectId: process.env.VITE_PUBLIC_APP_ID
+    }
+  }
+});
+
+const APP_ID = process.env.VITE_PUBLIC_APP_ID;
+if (!APP_ID) {
+  throw new Error('Missing VITE_PUBLIC_APP_ID environment variable');
+}
+
+// Initialize ZAPT, which provides the customerSupport function
+const { customerSupport } = initializeZapt(APP_ID);
+
+export default async function handler(req, res) {
+  console.log('Customer support endpoint hit');
+  
+  if (req.method !== 'POST') {
+    console.log('Method not allowed:', req.method);
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+  
+  try {
+    // Authenticate the user
+    const user = await authenticateUser(req);
+    console.log('User authenticated:', user.email);
+    
+    const { email } = req.body;
+    if (!email) {
+      console.error('Missing email in request body');
+      return res.status(400).json({ error: 'Missing email' });
+    }
+    
+    // Verify the authenticated user matches the requested email
+    if (user.email !== email) {
+      console.error('Email mismatch between authenticated user and request');
+      return res.status(403).json({ error: 'Unauthorized access' });
+    }
+    
+    const zaptSecretKey = process.env.ZAPT_SECRET_KEY;
+    if (!zaptSecretKey) {
+      console.error('Missing ZAPT_SECRET_KEY environment variable');
+      throw new Error('Missing ZAPT_SECRET_KEY environment variable');
+    }
+    
+    // Call the ZAPT customerSupport function to get Stream Chat credentials
+    const supportResponse = await customerSupport(email, zaptSecretKey);
+    console.log('Customer support response received (token hidden):', {
+      ...supportResponse,
+      token: supportResponse.token ? '[REDACTED]' : undefined
+    });
+    
+    return res.status(200).json(supportResponse);
+  } catch (error) {
+    console.error('Error in customerSupport endpoint:', error);
+    Sentry.captureException(error, {
+      extra: { 
+        endpoint: '/api/customerSupport',
+        method: req.method
+      }
+    });
+    return res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+}
