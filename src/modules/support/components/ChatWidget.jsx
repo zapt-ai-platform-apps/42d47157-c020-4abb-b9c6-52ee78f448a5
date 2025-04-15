@@ -39,58 +39,17 @@ const CustomChannelHeader = () => (
   </div>
 );
 
-// Custom avatar component for better integration with Tailwind
-const CustomAvatar = ({ image, name }) => {
-  // Extract initials from name
-  const getInitials = (userName) => {
-    if (!userName) return "?";
-    return userName
-      .split(' ')
-      .map((name) => name[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-
-  if (image) {
-    return (
-      <div className="w-8 h-8 rounded-full overflow-hidden">
-        <img src={image} alt={name} className="w-full h-full object-cover" />
-      </div>
-    );
-  }
-
-  // Generate a consistent color based on the name
-  const getColorClass = (userName) => {
-    if (!userName) return "bg-gray-400";
-    const colors = [
-      "bg-red-500", "bg-blue-500", "bg-green-500", 
-      "bg-yellow-500", "bg-purple-500", "bg-pink-500",
-      "bg-indigo-500", "bg-teal-500"
-    ];
-    const hash = userName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
-  };
-
-  return (
-    <div 
-      className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium ${getColorClass(name)}`}
-    >
-      {getInitials(name)}
-    </div>
-  );
-};
-
 // Error display component
 const ErrorDisplay = ({ message, onRetry }) => (
-  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto text-red-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center h-full flex flex-col items-center justify-center">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
-    <p className="text-red-800 mb-3">{message}</p>
+    <h3 className="text-red-700 text-lg font-medium mb-2">Connection Error</h3>
+    <p className="text-red-600 mb-6 max-w-xs mx-auto">{message}</p>
     <button 
       onClick={onRetry}
-      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-150 cursor-pointer"
+      className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-md text-sm font-medium transition-colors duration-150 cursor-pointer"
     >
       Try Again
     </button>
@@ -112,6 +71,7 @@ const ChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotification, setShowNotification] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   const chatContainerRef = useRef(null);
   
   // Track window dimensions for responsive behavior
@@ -158,29 +118,37 @@ const ChatWidget = () => {
         disconnectChat();
       }
     };
-  }, []);
+  }, [disconnectChat, client]);
 
   // If user is not logged in, don't show the chat widget
   if (!user) {
     return null;
   }
 
+  const handleRetry = () => {
+    setConnectionAttempts(prev => prev + 1);
+    connectChat();
+  };
+
   const toggleChat = async () => {
     if (!isOpen) {
       try {
+        setConnectionAttempts(prev => prev + 1);
         await connectChat();
         setIsOpen(true);
         setUnreadCount(0); // Reset unread count when opening
       } catch (e) {
         console.error('Failed to open chat:', e);
         Sentry.captureException(e, {
-          extra: { action: 'toggleChat', opening: true }
+          extra: { 
+            action: 'toggleChat', 
+            opening: true,
+            connectionAttempts
+          }
         });
       }
     } else {
       setIsOpen(false);
-      // We'll keep the connection alive for a while in case the user reopens the chat
-      // setTimeout(disconnectChat, 60000); // Disconnect after 1 minute of being closed
     }
   };
 
@@ -278,10 +246,8 @@ const ChatWidget = () => {
         >
           {error ? (
             <ErrorDisplay 
-              message={error} 
-              onRetry={() => {
-                connectChat();
-              }}
+              message={`${error} (Attempt ${connectionAttempts})`} 
+              onRetry={handleRetry}
             />
           ) : (
             client && channel ? (
@@ -305,6 +271,18 @@ const ChatWidget = () => {
           )}
         </div>
       )}
+      
+      {/* Made on ZAPT badge */}
+      <div className="fixed bottom-4 left-4 z-10">
+        <a 
+          href="https://www.zapt.ai" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-xs text-gray-500 hover:text-indigo-600 transition-colors"
+        >
+          Made on ZAPT
+        </a>
+      </div>
     </div>
   );
 };

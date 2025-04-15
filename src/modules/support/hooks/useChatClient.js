@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { StreamChat } from 'stream-chat';
 import { useAuthContext } from '@/modules/auth';
 import * as Sentry from '@sentry/browser';
@@ -11,7 +11,19 @@ const useChatClient = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState(null);
 
-  const connectChat = async () => {
+  const connectChat = useCallback(async () => {
+    // Clear any previous clients/connections to avoid state conflicts
+    if (client) {
+      try {
+        await client.disconnectUser();
+      } catch (e) {
+        console.warn('Error while disconnecting previous client:', e);
+      }
+    }
+    
+    setClient(null);
+    setChannel(null);
+    
     try {
       setIsConnecting(true);
       setError(null);
@@ -23,7 +35,12 @@ const useChatClient = () => {
       }
       
       // Get current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication error: ' + sessionError.message);
+      }
       
       if (!session?.access_token) {
         console.error('No active session found');
@@ -43,21 +60,64 @@ const useChatClient = () => {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Failed to fetch customer support data (${response.status})`);
+        const errorText = await response.text();
+        let errorMessage;
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || `Server error (${response.status})`;
+        } catch (e) {
+          errorMessage = `Failed to fetch customer support data (${response.status}): ${errorText.substring(0, 100)}`;
+        }
+        
+        console.error('API response error:', errorMessage);
+        throw new Error(errorMessage);
       }
       
-      const { token, channelId, userId, STREAM_KEY } = await response.json();
-      console.log('Received Stream chat credentials for channel:', channelId);
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        console.error('Failed to parse API response as JSON:', e);
+        throw new Error('Invalid response format from server');
+      }
       
-      if (!token || !channelId || !userId || !STREAM_KEY) {
-        throw new Error('Incomplete customer support data returned from server');
+      const { token, channelId, userId, STREAM_KEY } = responseData;
+      
+      console.log('Received Stream chat credentials:', {
+        hasToken: !!token,
+        channelId,
+        userId,
+        hasStreamKey: !!STREAM_KEY
+      });
+      
+      if (!token) {
+        throw new Error('Missing authentication token for chat');
+      }
+      
+      if (!channelId) {
+        throw new Error('Missing channel ID for chat');
+      }
+      
+      if (!userId) {
+        throw new Error('Missing user ID for chat');
+      }
+      
+      if (!STREAM_KEY) {
+        throw new Error('Missing Stream API key');
       }
       
       // Initialize StreamChat client
       const streamClient = StreamChat.getInstance(STREAM_KEY);
       
+      // Check if already connected to avoid errors
+      if (streamClient.userID) {
+        console.log('Client already has a user connected, disconnecting first');
+        await streamClient.disconnectUser();
+      }
+      
       // Connect user to Stream
+      console.log('Connecting to Stream as user:', userId);
       await streamClient.connectUser(
         { 
           id: userId, 
@@ -70,13 +130,15 @@ const useChatClient = () => {
       console.log('Connected to Stream Chat as user:', userId);
       
       // Create and watch channel
+      console.log('Creating channel:', channelId);
       const streamChannel = streamClient.channel('messaging', channelId, {
         name: 'Customer Support',
         members: [userId]
       });
       
+      console.log('Watching channel');
       await streamChannel.watch();
-      console.log('Watching support channel:', channelId);
+      console.log('Successfully watching support channel:', channelId);
       
       setClient(streamClient);
       setChannel(streamChannel);
@@ -93,9 +155,9 @@ const useChatClient = () => {
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, [user, client]);
 
-  const disconnectChat = async () => {
+  const disconnectChat = useCallback(async () => {
     if (client) {
       try {
         console.log('Disconnecting from Stream Chat');
@@ -112,7 +174,7 @@ const useChatClient = () => {
         });
       }
     }
-  };
+  }, [client, user]);
 
   return { 
     client, 

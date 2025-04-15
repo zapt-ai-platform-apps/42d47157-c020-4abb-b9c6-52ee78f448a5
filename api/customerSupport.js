@@ -1,18 +1,6 @@
 import { initializeZapt } from '@zapt/zapt-js';
-import * as Sentry from '@sentry/node';
+import Sentry from './_sentry.js';
 import { authenticateUser } from './_apiUtils.js';
-
-// Initialize Sentry
-Sentry.init({
-  dsn: process.env.VITE_PUBLIC_SENTRY_DSN,
-  environment: process.env.VITE_PUBLIC_APP_ENV,
-  initialScope: {
-    tags: {
-      type: 'backend',
-      projectId: process.env.VITE_PUBLIC_APP_ID
-    }
-  }
-});
 
 const APP_ID = process.env.VITE_PUBLIC_APP_ID;
 if (!APP_ID) {
@@ -54,10 +42,24 @@ export default async function handler(req, res) {
     }
     
     // Call the ZAPT customerSupport function to get Stream Chat credentials
+    console.log('Calling customerSupport with email:', email);
     const supportResponse = await customerSupport(email, zaptSecretKey);
-    console.log('Customer support response received (token hidden):', {
-      ...supportResponse,
-      token: supportResponse.token ? '[REDACTED]' : undefined
+    
+    // Validate response contains required fields
+    if (!supportResponse || !supportResponse.token || !supportResponse.channelId || 
+        !supportResponse.userId || !supportResponse.STREAM_KEY) {
+      console.error('Incomplete support response:', {
+        ...supportResponse,
+        token: supportResponse?.token ? '[REDACTED]' : undefined
+      });
+      throw new Error('Incomplete customer support data returned from server');
+    }
+    
+    console.log('Customer support response received:', {
+      channelId: supportResponse.channelId,
+      userId: supportResponse.userId,
+      hasToken: !!supportResponse.token,
+      hasStreamKey: !!supportResponse.STREAM_KEY
     });
     
     return res.status(200).json(supportResponse);
@@ -66,7 +68,8 @@ export default async function handler(req, res) {
     Sentry.captureException(error, {
       extra: { 
         endpoint: '/api/customerSupport',
-        method: req.method
+        method: req.method,
+        email: req.body?.email,
       }
     });
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
