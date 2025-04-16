@@ -107,7 +107,8 @@ export default async function handler(req, res) {
           },
           subscription_data: {
             application_fee_percent: 30
-          }
+          },
+          allow_promotion_codes: true
         }, {
           stripeAccount: 'acct_1RBjPHB1e4Ppxoh0'
         });
