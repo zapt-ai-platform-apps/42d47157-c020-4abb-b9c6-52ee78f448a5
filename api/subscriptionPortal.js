@@ -64,8 +64,6 @@ export default async function handler(req, res) {
     const session = await stripePortal.billingPortal.sessions.create({
       customer: customer.id,
       return_url: returnUrl || `${req.headers.origin || 'https://sidetrack.zapt.ai'}/dashboard`,
-    }, {
-      stripeAccount: 'acct_1RBjPHB1e4Ppxoh0'
     });
     
     console.log(`Created portal session: ${session.url}`);
