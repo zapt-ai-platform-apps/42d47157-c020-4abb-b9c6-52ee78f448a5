@@ -55,12 +55,12 @@ export default async function handler(req, res) {
     const { returnUrl } = req.body;
     
     // Check which API key to use for customer portal
-    if (!process.env.STRIPE_API_KEY_CHECKOUTS) {
+    if (!process.env.STRIPE_API_KEY) {
       throw new Error('Missing STRIPE_API_KEY_CHECKOUTS environment variable');
     }
     
     // Create a billing portal session
-    const stripePortal = new Stripe(process.env.STRIPE_API_KEY_CHECKOUTS);
+    const stripePortal = new Stripe(process.env.STRIPE_API_KEY);
     const session = await stripePortal.billingPortal.sessions.create({
       customer: customer.id,
       return_url: returnUrl || `${req.headers.origin || 'https://sidetrack.zapt.ai'}/dashboard`,
